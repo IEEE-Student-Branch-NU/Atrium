@@ -1,3 +1,4 @@
+import { Landmark } from 'lucide-react'
 import { LoginForm } from './login-form'
 
 export default function LoginPage() {
@@ -13,18 +14,7 @@ export default function LoginPage() {
         {/* IEEE Logo & Branding */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-8 w-8"
-            >
-              <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
-            </svg>
+            <Landmark className="h-8 w-8" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">
             IEEE SBNU Portal

@@ -118,7 +118,7 @@ export default async function PendingPage() {
                   <path d="M12 8h.01" />
                 </svg>
                 <span>
-                  An Admin, SuperAdmin, or MDO will review your registration.
+                  An Admin or MDO will review your registration.
                   This usually takes 1-2 business days.
                 </span>
               </div>

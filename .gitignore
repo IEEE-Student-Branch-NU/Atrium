@@ -39,8 +39,8 @@ yarn-error.log*
 # editor
 .vscode/
 
-# planning docs (contain sensitive implementation details)
-implementation_plan*
+# PRD
+IEEE_SBNU_Event_Creation_Portal_PRD.md
 
 # typescript
 *.tsbuildinfo

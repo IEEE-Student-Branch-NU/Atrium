@@ -1,0 +1,133 @@
+# Invisible SuperAdmin Architecture
+
+## The Problem
+
+```
+profiles table:
+| email                      | is_super_admin |
+|----------------------------|----------------|
+| 24btm040@nirmauni.ac.in   | true           |  ← VISIBLE TO EVERYONE
+| vraj@nirmauni.ac.in        | true           |  ← VISIBLE TO EVERYONE
+```
+
+Any admin who opens Supabase Dashboard or writes a simple query can see who the SuperAdmins are. That defeats the purpose.
+
+## The Solution: Zero-Trace SuperAdmin
+
+### Principle: **No database evidence. No API evidence. No UI evidence.**
+
+```mermaid
+flowchart TB
+    subgraph "Normal Login"
+        Login["Login (Google/Email)"] --> Session["Session: Technical Associate"]
+        Session --> PositionPerms["Permissions from position_permissions table"]
+    end
+
+    subgraph "SuperAdmin Elevation (Hidden)"
+        Sudo["/sudo (secret route)"] --> Passphrase["Enter shared passphrase"]
+        Passphrase --> ElevatedSession["Session: SuperAdmin Mode ON"]
+        ElevatedSession --> WildcardPerms["Permissions: * (all)"]
+    end
+
+    ElevatedSession -->|"De-escalate"| Session
+```
+
+---
+
+## Changes Required
+
+### 1. Remove `is_super_admin` from Database
+
+```sql
+ALTER TABLE profiles DROP COLUMN IF EXISTS is_super_admin;
+```
+
+**Zero trace in the DB.** No column, no table, nothing.
+
+---
+
+### 2. Store SuperAdmin Identities in `.env`
+
+```env
+# SuperAdmin emails (comma-separated, server-side only)
+SUPERADMIN_EMAILS=24btm040@nirmauni.ac.in,vraj_email@nirmauni.ac.in
+
+# Passphrase required to elevate to SuperAdmin mode
+SUPERADMIN_SECRET=<a strong shared passphrase you both know>
+```
+
+- `.env` is gitignored — never pushed to GitHub
+- Only people with server/hosting access can see this
+- Regular admins, members, and even the Supabase Dashboard **cannot** see these values
+
+---
+
+### 3. Hidden Elevation Route — `/sudo`
+
+A secret route that:
+1. Checks if the logged-in user's email is in `SUPERADMIN_EMAILS`
+2. Asks for the `SUPERADMIN_SECRET` passphrase
+3. If correct → sets a `superadminMode: true` flag in the JWT session (encrypted, invisible to clients reading cookies)
+4. Redirects back to wherever they came from, now with wildcard `*` permissions
+
+This route should:
+- NOT appear in any navigation/sidebar
+- NOT be linked from anywhere in the UI
+- Only accessible by manually typing the URL
+- Have a generic/boring page title (e.g., "System Settings") so it doesn't stand out in browser history
+
+---
+
+### 4. De-escalation
+
+A button/action to drop back to normal mode — removes `superadminMode` from the JWT and returns to position-based permissions. This way you can:
+- Browse as "Technical Associate" normally
+- Elevate to SuperAdmin when you need to nuke something
+- Drop back down when done
+
+---
+
+### 5. Update `permissions.ts`
+
+```typescript
+// Before (DATABASE CHECK):
+if (profile?.is_super_admin) return ['*']
+
+// After (SESSION CHECK):
+if (session.superadminMode) return ['*']
+```
+
+The permission system checks the **session**, not the database. And the session flag only gets set through the `/sudo` route.
+
+---
+
+## Security Summary
+
+| Attack Vector | Protection |
+|--------------|------------|
+| Admin queries `profiles` table | No `is_super_admin` column exists |
+| Admin reads Supabase Dashboard | No SuperAdmin data in any table |
+| Someone finds `/sudo` URL | Must be in `SUPERADMIN_EMAILS` AND know the passphrase |
+| Someone steals a JWT cookie | Cookie is encrypted with `AUTH_SECRET`; `superadminMode` is inside the encrypted payload |
+| New developer reads the codebase | They see the `/sudo` route exists, but can't use it without `.env` access |
+
+---
+
+## Files to Change
+
+| Action | File | Change |
+|--------|------|--------|
+| **MODIFY** | `.env` | Add `SUPERADMIN_EMAILS` + `SUPERADMIN_SECRET` |
+| **NEW** | `src/app/sudo/page.tsx` | Hidden elevation UI |
+| **NEW** | `src/app/auth/sudo-action.ts` | Server Action to verify passphrase + elevate session |
+| **MODIFY** | `src/auth.ts` + `src/auth.config.ts` | Add `superadminMode` to JWT callbacks |
+| **MODIFY** | `src/utils/auth/permissions.ts` | Check session instead of DB for SuperAdmin |
+| **NEW** | `supabase/migrations/00004_remove_superadmin_column.sql` | Drop `is_super_admin` column |
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> 1. **What is Vraj's Nirma email?** I need it for `SUPERADMIN_EMAILS` in `.env`.
+> 2. **What passphrase do you want?** Pick something only you two know. I'll hash it with bcrypt and store the hash in `.env`, so even if someone reads the `.env` they see a hash, not the actual phrase. OR I can keep it plaintext in `.env` (simpler but less secure). Your call.

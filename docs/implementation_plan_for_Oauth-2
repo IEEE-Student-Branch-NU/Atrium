@@ -1,0 +1,81 @@
+# Migrate from Supabase Auth to NextAuth (Auth.js)
+
+## Motivation
+
+"Aree bhai tum toh Dhoti khol rahe ho" 😂 
+Understood! If the goal is **educational** — forcing the team to learn how to stitch together different APIs (Google GCP, NextAuth, Supabase Database, ImageKit) rather than relying on one platform for everything — then this is a fantastic architectural exercise.
+
+By moving to NextAuth, we take control of the OAuth 2.0 flow directly.
+
+---
+
+## Architectural Shift
+
+```mermaid
+flowchart TD
+    Client["Next.js Client (React)"]
+    Server["Next.js Server Actions"]
+    NextAuth["NextAuth.js (Auth)"]
+    GCP["Google Cloud (OAuth)"]
+    Supabase["Supabase (Database only)"]
+    
+    Client -->|"Login Click"| NextAuth
+    NextAuth <-->|"OAuth Flow"| GCP
+    NextAuth -->|"Creates Session"| Server
+    Server -->|"Reads Session"| NextAuth
+    Server <-->|"Query Data (Service Role)"| Supabase
+```
+
+### Key Changes:
+1. **Supabase Auth is out.** We no longer use `@supabase/ssr` or `auth.users`.
+2. **NextAuth is in.** We will install `next-auth` and configure the Google Provider.
+3. **Database Independence.** The `profiles` table will no longer be linked to `auth.users` via a foreign key. We will manage the `profiles` table directly from NextAuth callbacks.
+4. **Server-Side Authorization.** Because we aren't using Supabase Auth, we can't easily use Row Level Security (RLS) on the client. Instead, all data fetching/mutating will happen via **Next.js Server Actions**. The server actions will verify the NextAuth session, check our custom permissions utility, and then interact with Supabase using the `SERVICE_ROLE_KEY` (which bypasses RLS).
+
+---
+
+## Proposed Implementation
+
+### 1. Database Schema Fix
+We need to decouple `profiles` from Supabase's internal `auth.users` table.
+- Drop the foreign key constraint on `profiles.id`.
+- Drop the `handle_new_user` trigger (NextAuth will handle user creation).
+
+### 2. NextAuth Configuration (`src/auth.ts`)
+Install `next-auth` and configure it:
+- **Provider:** Google (requires `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` in `.env`).
+- **Callbacks:**
+  - `signIn`: Validate the `@nirmauni.ac.in` domain.
+  - `jwt` / `session`: Attach the user's `profile.id` and `status` to the session so the frontend knows if they are pending or approved.
+  - On first login, check if the email exists in `profiles`. If not, create a placeholder profile (or redirect to the `/complete-registration` page).
+
+### 3. Rewrite Auth Actions & Middleware
+- Remove `@supabase/ssr` from `middleware.ts`. Use NextAuth's middleware instead to protect routes.
+- Update `actions.ts` to use NextAuth's `signIn` and `signOut` methods.
+
+### 4. Complete Registration Flow
+Because Google OAuth happens via NextAuth, the flow changes slightly:
+1. User clicks "Sign in with Google".
+2. NextAuth handles the GCP handshake.
+3. NextAuth callback checks our Supabase `profiles` table.
+4. If no profile exists, NextAuth redirects them to `/complete-registration`.
+5. User enters IEEE Membership ID. Server Action creates the row in `profiles` and updates their status.
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Email/Password Auth:** NextAuth supports email/password (Credentials provider), but it requires us to securely hash passwords (using bcrypt) and store them in the database manually. Do you want to build the Email/Password flow yourself, or should we make this portal **Google-only** for simplicity and security? (Google-only is highly recommended for college portals to ensure only verified students get in).
+
+> [!IMPORTANT]
+> **NextAuth vs Auth.js v5:** NextAuth is currently transitioning to Auth.js v5 (which natively supports Next.js App Router and Server Actions). I recommend we use the `beta` version of Auth.js v5 for the most modern architecture. Does that sound good?
+
+---
+
+## Verification Plan
+
+1. **Install dependencies:** `npm i next-auth@beta`
+2. **Setup GCP:** You will need to create the Google Client ID and Secret in GCP and put them in `.env`.
+3. **Database Update:** Run a quick SQL query to decouple the `profiles` table.
+4. **Test Flow:** Run `npm run dev`, click Sign In, authenticate via Google, and hit the complete registration screen.

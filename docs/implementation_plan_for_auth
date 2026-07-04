@@ -1,0 +1,449 @@
+# Gated Registration + Permission-Based Access Control
+
+## Summary of Changes from Original Design
+
+| Area | Before | After |
+|------|--------|-------|
+| Authorization | `portal_role` enum (member/admin/super_admin) | **Permission-based** — positions → permissions, APIs check permissions |
+| Event creation | `can_create_events` boolean on memberships | `create_events` **permission** (assignable via position or direct grant) |
+| Registration | Open Google OAuth, anyone with @nirmauni.ac.in | **Gated** — IEEE Membership ID required, admin/MDO approval |
+| MDO | Didn't exist | **Position** with `approve_registrations` permission |
+| SuperAdmin | Was a portal_role | `is_super_admin` flag on profiles (global bypass) |
+| Member validation | None | **Pre-approved members table** — MDO pre-loads IDs for auto-approval |
+
+---
+
+## Revised Auth Workflow
+
+```mermaid
+flowchart TD
+    A["User visits portal"] --> B{"Has account?"}
+    
+    B -->|"No → /signup"| S1["Signup Form"]
+    S1 --> S2["Enter: Email, Password, Full Name,\nPhone, IEEE Membership ID, Section"]
+    S2 --> S3{"Membership ID in\npre_approved_members?"}
+    S3 -->|"Yes"| S4["Auto-approve ✓\nstatus = approved"]
+    S3 -->|"No"| S5["status = pending\nAwaiting manual approval"]
+    S4 --> DASH["Dashboard"]
+    S5 --> PEND["/pending — Waiting screen"]
+    
+    B -->|"Yes → /login"| L1["Login Page"]
+    L1 --> L2["Email + Password"]
+    L1 --> L3["Continue with Google"]
+    L2 --> AUTH{"Auth valid?"}
+    L3 --> AUTH
+    AUTH -->|"No"| L1
+    AUTH -->|"Yes"| STAT{"profiles.status?"}
+    
+    STAT -->|"approved"| DASH
+    STAT -->|"pending"| PEND
+    STAT -->|"rejected"| REJ["/rejected — Denied screen"]
+    
+    L3 --> GCHECK{"Profile exists?"}
+    GCHECK -->|"No"| CREG["/complete-registration\nFill IEEE ID + details"]
+    CREG --> S3
+    GCHECK -->|"Yes"| STAT
+    
+    ADMIN["Admin / SuperAdmin / MDO"] --> QUEUE["Pending Registrations Queue"]
+    QUEUE --> DECIDE{"Approve / Reject"}
+    DECIDE -->|"Approve"| DASH
+    DECIDE -->|"Reject + reason"| REJ
+```
+
+---
+
+## Permission-Based Access Control
+
+### How It Works
+
+```
+User authenticates
+  → Look up active membership(s) in target branch
+  → Get position(s) from membership
+  → Get permissions from position_permissions
+  → UNION with any direct grants from member_permissions
+  → SuperAdmin flag bypasses everything
+  
+API checks: has_permission(user, branch, 'approve_events')
+```
+
+### Permission Definitions
+
+| Permission | Description | Typical Positions |
+|-----------|-------------|-------------------|
+| `create_events` | Create event drafts in a branch | Chair, Vice Chair, Technical Head |
+| `approve_events` | Approve/reject pending events | Chair, Vice Chair |
+| `manage_events` | Edit/delete any event in branch | Chair |
+| `manage_members` | Assign positions, grant permissions | Chair, Vice Chair |
+| `approve_registrations` | Approve/reject new member signups | MDO, Chair |
+| `view_members` | See member list and history | All positions |
+| `view_audit_log` | Access audit trail | Chair, Vice Chair |
+| `manage_event_types` | Add/edit event categories | Chair |
+| `manage_positions` | Create custom positions for branch | Chair |
+
+> [!NOTE]
+> **SuperAdmins** (`is_super_admin = true` on profiles) bypass the entire permission system. They can do everything in every branch. This is for you, Vraj, and the Faculty Mentor only.
+
+---
+
+## Schema Changes
+
+### Migration: `00002_permission_system.sql`
+
+#### 1. Remove `portal_role` enum (replaced by permissions)
+```sql
+ALTER TABLE memberships DROP COLUMN portal_role;
+ALTER TABLE memberships DROP COLUMN can_create_events;
+DROP TYPE portal_role;
+```
+
+#### 2. Add registration fields to `profiles`
+```sql
+CREATE TYPE registration_status AS ENUM ('pending', 'approved', 'rejected');
+
+ALTER TABLE profiles ADD COLUMN ieee_membership_id TEXT UNIQUE;
+ALTER TABLE profiles ADD COLUMN phone TEXT;
+ALTER TABLE profiles ADD COLUMN section TEXT DEFAULT 'Gujarat Section';
+ALTER TABLE profiles ADD COLUMN membership_expiry DATE;
+ALTER TABLE profiles ADD COLUMN is_super_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE profiles ADD COLUMN status registration_status NOT NULL DEFAULT 'pending';
+ALTER TABLE profiles ADD COLUMN approved_by UUID REFERENCES profiles(id);
+ALTER TABLE profiles ADD COLUMN approved_at TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN rejected_reason TEXT;
+```
+
+#### 3. Permissions table
+```sql
+CREATE TABLE permissions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL UNIQUE,     -- 'create_events', 'approve_events', etc.
+  description TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Seed permissions
+INSERT INTO permissions (name, description) VALUES
+  ('create_events',         'Create event drafts in a branch'),
+  ('approve_events',        'Approve or reject pending events'),
+  ('manage_events',         'Edit or delete any event in branch'),
+  ('manage_members',        'Assign positions and grant permissions'),
+  ('approve_registrations', 'Approve or reject new member signups'),
+  ('view_members',          'View member list and role history'),
+  ('view_audit_log',        'Access the audit trail'),
+  ('manage_event_types',    'Add or edit event categories'),
+  ('manage_positions',      'Create custom positions for the branch');
+```
+
+#### 4. Position → Permission mapping
+```sql
+CREATE TABLE position_permissions (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  position_id   UUID NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
+  permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+
+  UNIQUE (position_id, permission_id)
+);
+```
+
+#### 5. Direct member permission grants (ad-hoc overrides)
+```sql
+CREATE TABLE member_permissions (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  branch_id     UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+  granted_by    UUID NOT NULL REFERENCES profiles(id),
+  granted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  revoked_at    TIMESTAMPTZ,            -- NULL = active
+
+  UNIQUE (profile_id, branch_id, permission_id, granted_at)
+);
+
+CREATE INDEX idx_member_permissions_active
+  ON member_permissions (profile_id, branch_id)
+  WHERE revoked_at IS NULL;
+```
+
+#### 6. Pre-approved members (MDO/SuperAdmin pre-loads IEEE IDs)
+```sql
+CREATE TABLE pre_approved_members (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ieee_membership_id   TEXT NOT NULL UNIQUE,
+  name                 TEXT NOT NULL,
+  email                TEXT,             -- optional hint
+  added_by             UUID NOT NULL REFERENCES profiles(id),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### 7. Seed MDO position for all branches
+```sql
+INSERT INTO positions (branch_id, name)
+SELECT id, 'MDO' FROM branches
+ON CONFLICT (branch_id, name) DO NOTHING;
+```
+
+---
+
+## Updated ERD
+
+```mermaid
+erDiagram
+    profiles {
+        UUID id PK
+        TEXT email UK
+        TEXT full_name
+        TEXT avatar_url
+        TEXT ieee_membership_id UK
+        TEXT phone
+        TEXT section
+        DATE membership_expiry
+        BOOLEAN is_super_admin
+        registration_status status
+        UUID approved_by FK
+        TIMESTAMPTZ approved_at
+        TEXT rejected_reason
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    branches {
+        UUID id PK
+        TEXT name
+        TEXT slug UK
+        UUID parent_id FK
+        TEXT description
+        TIMESTAMPTZ created_at
+    }
+
+    positions {
+        UUID id PK
+        UUID branch_id FK
+        TEXT name
+        TIMESTAMPTZ created_at
+    }
+
+    permissions {
+        UUID id PK
+        TEXT name UK
+        TEXT description
+        TIMESTAMPTZ created_at
+    }
+
+    position_permissions {
+        UUID id PK
+        UUID position_id FK
+        UUID permission_id FK
+    }
+
+    member_permissions {
+        UUID id PK
+        UUID profile_id FK
+        UUID branch_id FK
+        UUID permission_id FK
+        UUID granted_by FK
+        TIMESTAMPTZ granted_at
+        TIMESTAMPTZ revoked_at
+    }
+
+    memberships {
+        UUID id PK
+        UUID profile_id FK
+        UUID branch_id FK
+        UUID position_id FK
+        DATE joined_date
+        TIMESTAMPTZ assigned_at
+        TIMESTAMPTZ ended_at
+        UUID assigned_by FK
+        TEXT reason
+        TIMESTAMPTZ created_at
+    }
+
+    pre_approved_members {
+        UUID id PK
+        TEXT ieee_membership_id UK
+        TEXT name
+        TEXT email
+        UUID added_by FK
+        TIMESTAMPTZ created_at
+    }
+
+    event_types {
+        UUID id PK
+        TEXT name UK
+        TEXT description
+        TIMESTAMPTZ created_at
+    }
+
+    events {
+        UUID id PK
+        UUID branch_id FK
+        UUID creator_id FK
+        UUID event_type_id FK
+        TEXT name
+        TEXT description
+        TIMESTAMPTZ event_date
+        TEXT organizer_email
+        JSONB banner
+        INT capacity
+        TEXT location
+        event_status status
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ submitted_at
+        TIMESTAMPTZ published_at
+        TIMESTAMPTZ updated_at
+    }
+
+    event_approvals {
+        UUID id PK
+        UUID event_id FK
+        INT level
+        UUID approver_id FK
+        approval_decision decision
+        TEXT comment
+        TIMESTAMPTZ decided_at
+    }
+
+    event_audit_log {
+        UUID id PK
+        UUID event_id
+        TEXT action
+        UUID changed_by FK
+        JSONB details
+        TIMESTAMPTZ created_at
+    }
+
+    membership_audit_log {
+        UUID id PK
+        UUID profile_id FK
+        UUID branch_id FK
+        TEXT action
+        UUID changed_by FK
+        JSONB details
+        TIMESTAMPTZ created_at
+    }
+
+    profiles ||--o{ memberships : "profile_id"
+    profiles ||--o{ member_permissions : "profile_id"
+    profiles ||--o{ events : "creator_id"
+    profiles ||--o{ event_approvals : "approver_id"
+
+    branches ||--o| branches : "parent_id"
+    branches ||--o{ positions : "branch_id"
+    branches ||--o{ memberships : "branch_id"
+    branches ||--o{ events : "branch_id"
+    branches ||--o{ member_permissions : "branch_id"
+
+    positions ||--o{ memberships : "position_id"
+    positions ||--o{ position_permissions : "position_id"
+    permissions ||--o{ position_permissions : "permission_id"
+    permissions ||--o{ member_permissions : "permission_id"
+
+    pre_approved_members }o--|| profiles : "added_by"
+    event_types ||--o{ events : "event_type_id"
+    events ||--o{ event_approvals : "event_id"
+    events ||--o{ event_audit_log : "event_id"
+    profiles ||--o{ membership_audit_log : "profile_id"
+```
+
+---
+
+## Authorization Helper (Server-Side)
+
+Core utility function used by every API:
+
+```typescript
+// src/utils/auth/permissions.ts
+
+async function getUserPermissions(
+  supabase, profileId, branchId
+): Promise<string[]> {
+  // 1. Check SuperAdmin bypass
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_super_admin')
+    .eq('id', profileId)
+    .single()
+  
+  if (profile?.is_super_admin) return ['*'] // all permissions
+
+  // 2. Get position-based permissions
+  const { data: posPerms } = await supabase
+    .from('memberships')
+    .select(`
+      positions!inner (
+        position_permissions!inner (
+          permissions!inner ( name )
+        )
+      )
+    `)
+    .eq('profile_id', profileId)
+    .eq('branch_id', branchId)
+    .is('ended_at', null)
+
+  // 3. Get direct grants
+  const { data: directPerms } = await supabase
+    .from('member_permissions')
+    .select('permissions!inner ( name )')
+    .eq('profile_id', profileId)
+    .eq('branch_id', branchId)
+    .is('revoked_at', null)
+
+  // 4. Union and deduplicate
+  return [...new Set([...posPerms, ...directPerms])]
+}
+
+function hasPermission(perms: string[], required: string): boolean {
+  return perms.includes('*') || perms.includes(required)
+}
+```
+
+---
+
+## Files to Create / Modify
+
+### Schema
+| Action | File | Description |
+|--------|------|-------------|
+| NEW | `supabase/migrations/00002_permission_system.sql` | Full migration with all new tables, enums, seeds |
+
+### Auth & Permissions
+| Action | File | Description |
+|--------|------|-------------|
+| NEW | `src/utils/auth/permissions.ts` | `getUserPermissions()`, `hasPermission()` |
+| MODIFY | `src/app/auth/actions.ts` | Add `signUp()`, `signInWithEmail()` |
+| MODIFY | `src/app/auth/callback/route.ts` | Handle Google OAuth → incomplete profile redirect |
+| MODIFY | `src/utils/supabase/middleware.ts` | Check `profiles.status` after auth |
+| MODIFY | `src/utils/supabase/server.ts` | Update trigger to include new profile fields |
+
+### UI Pages
+| Action | File | Description |
+|--------|------|-------------|
+| MODIFY | `src/app/login/page.tsx` + `login-form.tsx` | Add email/password fields + signup link |
+| NEW | `src/app/signup/page.tsx` | Registration form with IEEE Membership ID |
+| NEW | `src/app/complete-registration/page.tsx` | For Google OAuth users missing profile data |
+| NEW | `src/app/pending/page.tsx` | "Waiting for approval" screen |
+| NEW | `src/app/rejected/page.tsx` | "Registration denied" screen with reason |
+
+### Docs
+| Action | File | Description |
+|--------|------|-------------|
+| MODIFY | `docs/SCHEMA.md` | Update with new permission system + pre-approved members |
+
+---
+
+## Verification Plan
+
+### Build & Type Check
+- `npx next build` must pass with zero errors
+
+### Manual Testing
+1. **Signup (pre-approved):** Enter a pre-loaded membership ID → auto-approved → dashboard
+2. **Signup (unknown ID):** Enter an unknown ID → pending → waiting screen
+3. **Login (email/password):** Approved user logs in → dashboard
+4. **Login (Google):** Approved user → dashboard (bypass)
+5. **Google (new user):** First-time Google user → /complete-registration → fill IEEE ID
+6. **Pending redirect:** Authenticated but pending user → any page → redirects to /pending
+7. **Rejected redirect:** Rejected user → any page → redirects to /rejected
+8. **Permission check:** User without `create_events` → cannot create event
+9. **SuperAdmin bypass:** SuperAdmin can do everything in any branch

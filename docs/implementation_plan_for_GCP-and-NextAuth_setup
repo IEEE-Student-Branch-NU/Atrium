@@ -1,0 +1,145 @@
+# NextAuth Migration — Implementation Plan
+
+## Goal
+Replace Supabase Auth with **NextAuth (Auth.js v5)** for:
+- Direct Google OAuth via GCP (no Supabase middleman)
+- Password hashing via `bcrypt` (not Supabase's internal hashing)
+- JWT sessions signed with `AUTH_SECRET`
+
+Supabase remains as the **database only** (accessed via `SERVICE_ROLE_KEY`).
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser -->|"Login"| NextAuth["Auth.js v5"]
+    NextAuth <-->|"OAuth 2.0"| Google["Google GCP"]
+    NextAuth -->|"JWT Session"| ServerActions["Server Actions"]
+    ServerActions <-->|"SERVICE_ROLE_KEY"| Supabase["Supabase (DB only)"]
+```
+
+---
+
+## Execution Plan
+
+### Phase 1: Install & Configure NextAuth
+
+#### 1.1 Install `next-auth@beta` (Auth.js v5)
+
+#### 1.2 [NEW] `src/auth.ts` — NextAuth configuration
+- Google provider with `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`
+- Credentials provider for email/password (uses `bcrypt.compare`)
+- `signIn` callback: validate `@nirmauni.ac.in` domain
+- `jwt` callback: attach `profileId`, `status`, `isMembershipComplete` to token
+- `session` callback: expose profile data to client
+
+#### 1.3 [NEW] `src/app/api/auth/[...nextauth]/route.ts`
+- NextAuth catch-all API route handler
+
+#### 1.4 [MODIFY] `.env`
+- Add `NEXTAUTH_URL=http://localhost:3000` (required by Auth.js v5)
+
+---
+
+### Phase 2: Database Schema Update
+
+#### 2.1 New migration: `00003_nextauth_migration.sql`
+```sql
+-- Add password_hash column for email/password users
+ALTER TABLE profiles ADD COLUMN password_hash TEXT;
+
+-- Remove the auth.users trigger (NextAuth manages users directly)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Remove FK constraint to auth.users (profiles now stand alone)
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_pkey;
+ALTER TABLE profiles ADD PRIMARY KEY (id);
+-- Note: profiles.id will be a UUID we generate ourselves
+```
+
+> [!WARNING]
+> This migration decouples `profiles` from `auth.users`. The `profiles` table becomes fully self-managed. Existing rows (if any) in `auth.users` will be orphaned. This is fine since we haven't launched yet.
+
+---
+
+### Phase 3: Rewrite Auth Layer
+
+#### 3.1 [MODIFY] `src/utils/supabase/server.ts`
+- Switch from `ANON_KEY` to `SERVICE_ROLE_KEY`
+- Remove cookie-based auth (NextAuth handles sessions)
+- Simple admin client for DB queries only
+
+#### 3.2 [DELETE] `src/utils/supabase/client.ts`
+- No more client-side Supabase access (all data goes through Server Actions)
+
+#### 3.3 [REWRITE] `src/app/auth/actions.ts`
+| Function | Change |
+|----------|--------|
+| `signInWithGoogle()` | → `signIn('google')` from NextAuth |
+| `signInWithEmail()` | → `signIn('credentials', { email, password })` from NextAuth |
+| `signUp()` | → Hash password with `bcrypt.hash(password, 12)`, INSERT into `profiles` directly |
+| `completeRegistration()` | → Get session via `auth()`, update profile via service-role Supabase |
+| `signOut()` | → `signOut()` from NextAuth |
+
+#### 3.4 [DELETE] `src/app/auth/callback/route.ts`
+- NextAuth handles OAuth callbacks at `/api/auth/callback/google` automatically
+
+#### 3.5 [REWRITE] `src/utils/supabase/middleware.ts`
+- Replace Supabase session check with NextAuth `auth()` call
+- Keep the 3-tier routing logic (public → auth-only → protected)
+- Query profile status via service-role Supabase client
+
+#### 3.6 [MODIFY] `src/middleware.ts` (root)
+- Wire up to new middleware function
+
+---
+
+### Phase 4: Update Pages (Swap auth calls)
+
+| Page | Change |
+|------|--------|
+| `src/app/page.tsx` | Replace `supabase.auth.getUser()` with `auth()` |
+| `src/app/pending/page.tsx` | Replace `supabase.auth.getUser()` with `auth()` |
+| `src/app/rejected/page.tsx` | Replace `supabase.auth.getUser()` with `auth()` |
+
+UI remains unchanged — only the data-fetching mechanism changes.
+
+---
+
+### Phase 5: Cleanup
+
+- Remove `@supabase/ssr` from `package.json` (no longer needed)
+- Keep `@supabase/supabase-js` (still need it for DB queries via service-role)
+- Update `.gitignore` to ensure `.env` is excluded
+
+---
+
+## File Change Summary
+
+| Action | File | Description |
+|--------|------|-------------|
+| **NEW** | `src/auth.ts` | NextAuth config (Google + Credentials providers) |
+| **NEW** | `src/app/api/auth/[...nextauth]/route.ts` | API route handler |
+| **NEW** | `supabase/migrations/00003_nextauth_migration.sql` | Add `password_hash`, drop trigger |
+| **REWRITE** | `src/app/auth/actions.ts` | All 5 functions rewritten |
+| **REWRITE** | `src/utils/supabase/middleware.ts` | NextAuth session checks |
+| **MODIFY** | `src/utils/supabase/server.ts` | Switch to SERVICE_ROLE_KEY |
+| **MODIFY** | `src/middleware.ts` | Wire to new middleware |
+| **MODIFY** | `src/app/page.tsx` | Swap `getUser()` → `auth()` |
+| **MODIFY** | `src/app/pending/page.tsx` | Swap `getUser()` → `auth()` |
+| **MODIFY** | `src/app/rejected/page.tsx` | Swap `getUser()` → `auth()` |
+| **MODIFY** | `.env` | Add `NEXTAUTH_URL` |
+| **DELETE** | `src/app/auth/callback/route.ts` | Replaced by NextAuth |
+| **DELETE** | `src/utils/supabase/client.ts` | No client-side Supabase |
+
+---
+
+## Verification Plan
+
+1. `npx next build` — must compile with zero errors
+2. Test email/password signup → verify bcrypt hash in `profiles.password_hash`
+3. Test Google OAuth → verify redirect to `/complete-registration` for new users
+4. Test pending/approved/rejected flows
+5. Verify all existing permission queries still work with service-role client

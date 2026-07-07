@@ -52,6 +52,8 @@ export async function signUp(formData: FormData) {
   const phone = formData.get('phone') as string
   const ieeeMembershipId = formData.get('ieeeMembershipId') as string
   const section = (formData.get('section') as string) || 'Gujarat Section'
+  const branchSlug = (formData.get('branch') as string) || 'sbnu'
+  const roleName = (formData.get('role') as string) || 'Member'
 
   // ── Validation ──────────────────────────────────────────
   if (!email || !password || !fullName || !ieeeMembershipId) {
@@ -72,6 +74,10 @@ export async function signUp(formData: FormData) {
 
   if (!/^\d{6,12}$/.test(ieeeMembershipId)) {
     return { error: 'IEEE Membership ID must be 6-12 digits.' }
+  }
+
+  if (phone && !/^\+91\s\d{5}\s\d{5}$/.test(phone)) {
+    return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
   }
 
   const supabase = createAdminClient()
@@ -112,7 +118,7 @@ export async function signUp(formData: FormData) {
   const newStatus = preApproved ? 'approved' : 'pending'
 
   // ── Insert profile directly into the database ───────────
-  const { error: insertError } = await supabase.from('profiles').insert({
+  const { data: profileData, error: insertError } = await supabase.from('profiles').insert({
     email,
     full_name: fullName,
     password_hash: passwordHash,
@@ -121,12 +127,15 @@ export async function signUp(formData: FormData) {
     section,
     status: newStatus,
     ...(preApproved ? { approved_at: new Date().toISOString() } : {}),
-  })
+  }).select('id').single()
 
   if (insertError) {
     console.error('Signup insert error:', insertError)
     return { error: 'Failed to create account. Please try again.' }
   }
+
+  // ── Create initial membership ───────────────────────────
+  await assignMembership(supabase, profileData.id, branchSlug, roleName)
 
   // ── Auto sign-in after successful signup ────────────────
   try {
@@ -158,6 +167,8 @@ export async function completeRegistration(formData: FormData) {
   const phone = formData.get('phone') as string
   const ieeeMembershipId = formData.get('ieeeMembershipId') as string
   const section = (formData.get('section') as string) || 'Gujarat Section'
+  const branchSlug = (formData.get('branch') as string) || 'sbnu'
+  const roleName = (formData.get('role') as string) || 'Member'
 
   if (!ieeeMembershipId) {
     return { error: 'IEEE Membership ID is required.' }
@@ -165,6 +176,10 @@ export async function completeRegistration(formData: FormData) {
 
   if (!/^\d{6,12}$/.test(ieeeMembershipId)) {
     return { error: 'IEEE Membership ID must be 6-12 digits.' }
+  }
+
+  if (phone && !/^\+91\s?\d{10}$/.test(phone)) {
+    return { error: 'Phone number must be a valid Indian mobile number (+91 followed by 10 digits).' }
   }
 
   const supabase = createAdminClient()
@@ -196,6 +211,9 @@ export async function completeRegistration(formData: FormData) {
     return { error: 'Failed to save details. Please try again.' }
   }
 
+  // ── Create initial membership ───────────────────────────
+  await assignMembership(supabase, session.user.id, branchSlug, roleName)
+
   if (newStatus === 'approved') {
     redirect('/')
   } else {
@@ -208,4 +226,40 @@ export async function completeRegistration(formData: FormData) {
  */
 export async function signOut() {
   await nextAuthSignOut({ redirectTo: '/login' })
+}
+
+/**
+ * Helper to assign initial membership
+ */
+async function assignMembership(supabase: any, profileId: string, branchSlug: string, roleName: string) {
+  try {
+    const { data: branch } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('slug', branchSlug)
+      .single()
+      
+    if (!branch) return
+
+    let positionId = null
+    if (roleName !== 'Member') {
+      const { data: position } = await supabase
+        .from('positions')
+        .select('id')
+        .eq('branch_id', branch.id)
+        .eq('name', roleName)
+        .single()
+      if (position) {
+        positionId = position.id
+      }
+    }
+    
+    await supabase.from('memberships').insert({
+      profile_id: profileId,
+      branch_id: branch.id,
+      position_id: positionId,
+    })
+  } catch (err) {
+    console.error('Failed to assign membership:', err)
+  }
 }

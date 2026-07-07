@@ -1,0 +1,222 @@
+# Atrium Internal Portal — Implementation Plan (v2)
+
+## Background
+
+Auth is complete (login, signup, Google OAuth, complete-registration, pending/rejected flows). The root `/` page is a placeholder. We need to build a **permission-based internal portal** where each role sees different dashboard modules based on their position's permissions.
+
+---
+
+## Role → Dashboard Module Matrix
+
+Each position only sees the modules their permissions grant. The sidebar dynamically hides/shows items.
+
+| Module | Permission Required | MDO | Chair | Vice Chair | Gen Sec | Tech Head | Creative Head | Treasurer | Web Master | Tech Associate | Marketing Associate | Member |
+|:-------|:-------------------|:---:|:-----:|:----------:|:-------:|:---------:|:-------------:|:---------:|:----------:|:--------------:|:-------------------:|:------:|
+| **Dashboard Home** | *(always)* | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **My Events** | *(always)* | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Create Event** | `create_events` | | ✅ | ✅ | ✅ | ✅ | ✅ | | | ✅ | | |
+| **Approve Registrations** | `approve_registrations` | ✅ | ✅ | ✅ | | | | | | | | |
+| **Pre-Approved Members** | `approve_registrations` | ✅ | ✅ | ✅ | | | | | | | | |
+| **Approve Events** | `approve_events` | | ✅ | ✅ | | | | | | | | |
+| **Manage Events** | `manage_events` | | ✅ | ✅ | | | | | | | | |
+| **Members Directory** | `view_members` | ✅ | ✅ | ✅ | | ✅ | ✅ | | | | | |
+| **Manage Members** | `manage_members` | | ✅ | ✅ | | | | | | | | |
+| **Audit Log** | `view_audit_log` | | ✅ | ✅ | ✅ | | | | | | | |
+| **Analytics** | `approve_registrations` | ✅ | ✅ | ✅ | | | | | | | | |
+
+> [!NOTE]
+> New positions (Treasurer, Web Master, Technical Associate, Marketing Associate) start with **no special permissions** — they see Dashboard Home + My Events. An admin can grant them additional permissions later via Manage Members. This is by design: the permission system is flexible and doesn't require code changes.
+
+---
+
+## Proposed Changes
+
+### Phase 1 — Dashboard Shell & Permission Engine
+
+The shell provides sidebar, top bar, and shared layout. The permission engine decides what each user sees.
+
+#### [NEW] `src/lib/permissions.ts`
+Core permission utility. Server-side functions:
+- `getUserPermissions(profileId, branchId?)` — returns Set of permission names by combining position-based + direct grants + superadmin bypass
+- `hasPermission(profileId, permission, branchId?)` — boolean check
+- `getUserProfile(profileId)` — full profile with active memberships and positions
+- Uses the exact SQL pattern from SCHEMA.md §9
+
+#### [NEW] `src/lib/queries.ts`
+Shared Supabase query helpers:
+- `getDashboardStats(branchId?)` — event counts by status, pending registrations, active members
+- `getRecentActivity(limit)` — from `event_audit_log`
+- `getPendingRegistrations()` — profiles with `status = 'pending'`
+- `getPreApprovedMembers()` — from `pre_approved_members` table
+- `getMembers(branchId?, search?)` — approved members with positions
+
+#### [NEW] `src/app/(portal)/layout.tsx`
+Route group layout wrapping all portal pages. Contains:
+- Fetches user profile + permissions server-side
+- Passes permissions to the sidebar via props
+- Wraps children in sidebar + top bar shell
+
+#### [NEW] `src/components/portal/sidebar.tsx`
+Client component with:
+- Atrium branding (Landmark icon + "Atrium")
+- Nav links dynamically shown/hidden based on user permissions
+- Sections: **Overview** (Dashboard), **Events** (My Events, Create Event, Approve Events), **People** (Approvals, Pre-Approved, Members), **System** (Audit Log, Analytics)
+- Active state via `usePathname()`
+- Collapse toggle (desktop) / sheet overlay (mobile)
+- User card at bottom: avatar, name, position badge, branch
+
+#### [NEW] `src/components/portal/top-bar.tsx`
+- Mobile hamburger trigger
+- Page title / breadcrumb
+- Theme toggle (dark/light via `next-themes`)
+- User dropdown (profile, sign out)
+
+---
+
+### Phase 2 — Dashboard Home
+
+#### [NEW] `src/app/(portal)/page.tsx` (replaces current root page)
+Everyone sees this. Content adapts to permissions:
+- **All users**: Welcome message, your branch & position, quick links
+- **Users with `create_events`**: "Create Event" CTA card
+- **Users with `approve_registrations`**: Pending registrations count card with link
+- **Users with `approve_events`**: Pending event approvals count card
+- **Users with `view_members`**: Active members count card
+- Recent activity feed (scoped to user's branch)
+
+---
+
+### Phase 3 — Approval & Pre-Approval Management (MDO / Chair / Vice Chair)
+
+#### [NEW] `src/app/(portal)/approvals/page.tsx`
+**Requires `approve_registrations`**. Two tabs:
+1. **Pending Queue** — cards for each pending member: name, email, IEEE ID, branch they selected, role they selected, registration date. Approve ✅ / Reject ❌ buttons. Reject opens reason textarea.
+2. **History** — recently approved/rejected registrations with who approved and when.
+
+#### [NEW] `src/app/(portal)/approvals/actions.ts`
+- `approveRegistration(profileId)` — sets `status='approved'`, `approved_by`, `approved_at`
+- `rejectRegistration(profileId, reason)` — sets `status='rejected'`, `rejected_reason`
+- Permission check: caller must have `approve_registrations`
+
+#### [NEW] `src/app/(portal)/pre-approved/page.tsx`
+**Requires `approve_registrations`**. Manage the pre-approved members list:
+- Table of all pre-approved IEEE IDs with name, email
+- Add new pre-approved member form (IEEE ID + name + optional email)
+- Delete pre-approved entry
+- Shows which pre-approved IDs have already been claimed by registered users
+
+#### [NEW] `src/app/(portal)/pre-approved/actions.ts`
+- `addPreApprovedMember(ieeeMembershipId, name, email?)`
+- `removePreApprovedMember(id)`
+
+---
+
+### Phase 4 — Members Directory & Management
+
+#### [NEW] `src/app/(portal)/members/page.tsx`
+**Requires `view_members`**. Paginated table:
+- Columns: Name, Email, Branch, Position, IEEE ID, Phone, Joined Date, Status
+- Search by name/email
+- Filter by branch
+- Click row to expand member detail (membership history, permissions)
+
+#### [NEW] `src/app/(portal)/members/actions.ts`
+**Requires `manage_members`**:
+- `assignPosition(profileId, branchId, positionId)` — end old membership, create new
+- `grantPermission(profileId, branchId, permissionId)` — direct permission grant
+- `revokePermission(memberPermissionId)` — set `revoked_at`
+
+---
+
+### Phase 5 — Events (CRUD + Approval Flow)
+
+#### [NEW] `src/app/(portal)/events/page.tsx`
+Tabs based on permissions:
+- **My Events** *(all users)* — events created by current user
+- **All Events** *(requires `manage_events`)* — every event in the branch
+- **Pending Approval** *(requires `approve_events`)* — events awaiting review
+
+#### [NEW] `src/app/(portal)/events/create/page.tsx`
+**Requires `create_events`**. Form: name, description, date, location, capacity, event type (from `event_types`), branch, banner upload. Creates with `status = 'draft'`.
+
+#### [NEW] `src/app/(portal)/events/[id]/page.tsx`
+Event detail: full info, status badge, approval timeline, action buttons:
+- Creator: Edit (if draft), Submit for Approval, Delete
+- Approver: Approve / Reject with comment
+- Manager: Publish
+
+#### [NEW] `src/app/(portal)/events/actions.ts`
+- `createEvent(formData)`, `updateEvent(id, formData)`, `deleteEvent(id)`
+- `submitForApproval(id)` — changes status to `pending_approval`
+- `approveEvent(id, comment)`, `rejectEvent(id, comment)` — creates `event_approvals` row
+- `publishEvent(id)` — sets `status='published'`, `published_at`
+
+---
+
+### Phase 6 — Analytics (MDO / Chair)
+
+#### [NEW] `src/app/(portal)/analytics/page.tsx`
+**Requires `approve_registrations`**. Charts and stats:
+- Membership conversion funnel: signups → pending → approved → active
+- Members per branch (bar chart)
+- Registration trend over time (line chart)
+- Event stats: events by status, events by type
+- Approval response time averages
+
+> [!NOTE]
+> Charts will use a lightweight library. Options: `recharts` (React-native, popular) or raw SVG. I'll use **recharts** for speed and quality.
+
+---
+
+### Phase 7 — Polish & Infrastructure
+
+#### [MODIFY] `src/app/layout.tsx`
+- Metadata: title "Atrium | IEEE SBNU Portal", proper description
+- Add `ThemeProvider` from `next-themes` for dark mode toggle
+
+#### shadcn components to install
+- `table`, `tabs`, `dialog`, `sheet`, `textarea`, `select`, `skeleton`, `tooltip`, `scroll-area`, `progress`
+
+#### [NEW] Database migration: `00003_new_positions.sql`
+Add the new positions to each branch:
+- `Treasurer`, `Web Master`, `Technical Associate`, `Marketing Associate`
+- Assign default permissions (e.g., Technical Associate gets `create_events`)
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **New positions need a DB migration.** The signup form now shows the new roles, but the `positions` table in Supabase only has: Chair, Vice Chair, General Secretary, Technical Head, Creative Head, MDO. I need to create a migration SQL file (`00003_new_positions.sql`) that adds Treasurer, Web Master, Technical Associate, and Marketing Associate to each branch. You'll need to run this in Supabase SQL editor.
+
+> [!WARNING]
+> **Default permissions for new positions.** Currently new positions will have zero permissions (same as Member). After the portal is built, you can use the Manage Members module to grant permissions. But if you want certain defaults (e.g., Technical Associate should always get `create_events`), tell me now and I'll bake them into the migration.
+
+## Open Questions
+
+1. **Analytics library** — Should I use `recharts` for the membership analytics charts? It's ~45KB gzipped but gives us beautiful, animated charts out of the box.
+
+2. **ImageKit for event banners** — Integrate the ImageKit upload SDK now, or use a URL text input as placeholder?
+
+3. **Which permissions should new positions get by default?**
+   - Treasurer → any special permissions?
+   - Web Master → `create_events`? `manage_events`?
+   - Technical Associate → `create_events`?
+   - Marketing Associate → `create_events`?
+
+## Verification Plan
+
+### Automated Tests
+```bash
+npm run build
+```
+Full production build to catch type errors or broken imports.
+
+### Manual Verification
+- Log in as different roles and verify sidebar shows only permitted modules
+- Approve/reject a pending registration
+- Add/remove pre-approved members
+- Create event → submit → approve → publish flow
+- Check analytics page renders charts
+- Test dark mode toggle
+- Test mobile sidebar (sheet overlay)

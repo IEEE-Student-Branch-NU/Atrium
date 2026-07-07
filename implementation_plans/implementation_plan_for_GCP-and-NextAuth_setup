@@ -1,4 +1,4 @@
-# NextAuth Migration — Implementation Plan
+ # NextAuth Migration — Implementation Plan
 
 ## Goal
 Replace Supabase Auth with **NextAuth (Auth.js v5)** for:

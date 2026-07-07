@@ -1,36 +1,336 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
 
-## Getting Started
+# ⚡ Atrium
 
-First, run the development server:
+### IEEE Student Branch of Nirma University — Internal Portal
+
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![Auth.js](https://img.shields.io/badge/Auth.js-v5-7C3AED?logo=auth0&logoColor=white)](https://authjs.dev)
+[![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000?logo=vercel)](https://atrium-ieeenirma.vercel.app)
+[![License](https://img.shields.io/badge/License-Private-red)]()
+
+**Event creation, membership management, and approval workflows for IEEE SBNU.**
+
+[Live App](https://atrium-ieeenirma.vercel.app) · [Documentation](#-documentation) · [Getting Started](#-getting-started)
+
+</div>
+
+---
+
+## 📋 Overview
+
+Atrium is the internal management portal for **IEEE Student Branch of Nirma University (SBNU)**. It handles:
+
+- **🔐 Authentication** — Google OAuth + email/password with `@nirmauni.ac.in` domain restriction
+- **✅ Registration Gating** — New members require admin/MDO approval before accessing the portal
+- **📊 Permission-Based Access** — Granular, position-based permissions determine what each member sees
+- **📅 Event Management** — Create, submit, approve, and publish events through a multi-level approval workflow
+- **👥 Membership Management** — Track positions, branches, role history, and direct permission grants
+- **🔍 Audit Trail** — Immutable logs of all event and membership changes
+
+---
+
+## 🏗️ Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Framework** | [Next.js 16](https://nextjs.org) (App Router) | Full-stack React framework with Server Actions |
+| **Language** | [TypeScript 5](https://typescriptlang.org) | Type-safe development |
+| **Auth** | [NextAuth.js v5](https://authjs.dev) (Auth.js) | Google OAuth + Credentials with JWT sessions |
+| **Database** | [Supabase](https://supabase.com) (PostgreSQL) | Managed Postgres with admin client access |
+| **Styling** | [Tailwind CSS 4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) | Utility-first CSS + accessible component library |
+| **Deployment** | [Vercel](https://vercel.com) | Edge-optimized hosting with auto-deploys from GitHub |
+| **Icons** | [Lucide React](https://lucide.dev) | Consistent icon set |
+| **Fonts** | Google Sans | Brand typography |
+
+---
+
+## 📁 Project Structure
+
+```
+Atrium/
+├── docs/                          # 📖 Documentation
+│   ├── AUTH.md                    #    Authentication & authorization deep-dive
+│   └── SCHEMA.md                 #    Database schema reference (single source of truth)
+│
+├── implementation_plans/          # 📝 Historical implementation plans
+│   ├── implementation_plan_for_auth
+│   ├── implementation_plan_for_Oauth-2
+│   ├── implementation_plan_for_GCP-and-NextAuth_setup
+│   ├── implementation_plan_for_Dashbord-phase-1
+│   └── implementation_plan-brainstorming-superadmin
+│
+├── supabase/
+│   └── migrations/                # 🗄️ Database migrations (run in Supabase SQL editor)
+│       ├── 00001_initial_schema.sql
+│       ├── 00002_permission_system.sql
+│       ├── 00003_nextauth_migration.sql
+│       └── 00004_invisible_superadmin.sql
+│
+├── src/
+│   ├── app/
+│   │   ├── (portal)/              # 🏠 Dashboard route group (shared sidebar layout)
+│   │   │   └── page.tsx           #    Dashboard home
+│   │   ├── api/auth/[...nextauth] #    NextAuth API routes (auto-generated)
+│   │   ├── auth/actions.ts        #    Server actions: signUp, signIn, signOut, etc.
+│   │   ├── login/                 #    Login page (Google + email/password)
+│   │   ├── signup/                #    Registration page
+│   │   ├── complete-registration/ #    IEEE details form (Google OAuth users)
+│   │   ├── pending/               #    Waiting room for unapproved accounts
+│   │   ├── rejected/              #    Rejection notice with reason
+│   │   ├── sudo/                  #    SuperAdmin elevation (hidden)
+│   │   ├── layout.tsx             #    Root layout
+│   │   └── globals.css            #    Theme variables & base styles
+│   │
+│   ├── components/
+│   │   └── ui/                    #    shadcn/ui components (Button, Card, Input, etc.)
+│   │
+│   ├── lib/                       #    Shared utilities & query helpers
+│   │
+│   ├── utils/
+│   │   ├── auth/
+│   │   │   ├── permissions.ts     #    Permission engine (position + direct grants)
+│   │   │   └── sudo.ts            #    Sudo mode JWT cookie management
+│   │   └── supabase/
+│   │       ├── server.ts          #    createAdminClient() (service role)
+│   │       └── middleware.ts      #    Auth middleware (route protection)
+│   │
+│   ├── auth.config.ts             #    NextAuth config (Edge-safe, Google provider)
+│   ├── auth.ts                    #    NextAuth config (Node.js, adds Credentials + bcrypt)
+│   └── middleware.ts              #    Next.js middleware entry point
+│
+├── .env                           #    Environment variables (not committed)
+├── package.json
+├── tsconfig.json
+└── next.config.ts
+```
+
+---
+
+## 📖 Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[AUTH.md](docs/AUTH.md)** | Complete authentication & authorization reference. Covers Google OAuth flow, email/password signup, middleware route protection, permission engine, sudo mode, and security considerations. Includes Mermaid diagrams for every flow. |
+| **[SCHEMA.md](docs/SCHEMA.md)** | Database schema reference (v2). Every table, enum, trigger, index, and seed record — with ERD, permission matrix, and key query patterns. The single source of truth for the database. |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 18+ 
+- **npm** 9+
+- A **Supabase** project ([supabase.com](https://supabase.com))
+- A **Google Cloud** project with OAuth 2.0 credentials ([console.cloud.google.com](https://console.cloud.google.com))
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/IEEE-Student-Branch-NU/Atrium.git
+cd Atrium
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+# ── Supabase ──────────────────────────────────────
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# ── NextAuth.js ───────────────────────────────────
+AUTH_SECRET=your-random-secret-string
+NEXTAUTH_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# ── Google OAuth ──────────────────────────────────
+AUTH_GOOGLE_ID=your-google-client-id.apps.googleusercontent.com
+AUTH_GOOGLE_SECRET=GOCSPX-your-google-client-secret
+
+# ── Password Hashing ─────────────────────────────
+BCRYPT_SALT_ROUNDS=12
+```
+
+> **Google OAuth Setup:** In the Google Cloud Console, add `http://localhost:3000` to **Authorized JavaScript Origins** and `http://localhost:3000/api/auth/callback/google` to **Authorized Redirect URIs**. See [AUTH.md](docs/AUTH.md) for details.
+
+### 4. Set Up the Database
+
+Run the migrations **in order** in your Supabase SQL editor:
+
+1. `supabase/migrations/00001_initial_schema.sql` — Core tables, branches, positions, events
+2. `supabase/migrations/00002_permission_system.sql` — Permissions, position_permissions, pre-approval
+3. `supabase/migrations/00003_nextauth_migration.sql` — NextAuth-specific columns (password_hash)
+4. `supabase/migrations/00004_invisible_superadmin.sql` — Superadmins table
+
+### 5. Start Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) — you'll see the login page.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🔐 Authentication Overview
 
-## Learn More
+Atrium supports two authentication methods, both restricted to `@nirmauni.ac.in`:
 
-To learn more about Next.js, take a look at the following resources:
+```mermaid
+flowchart LR
+    A["Login Page"] --> B["Google OAuth"]
+    A --> C["Email + Password"]
+    B --> D["NextAuth JWT"]
+    C --> D
+    D --> E{"Middleware"}
+    E -->|"approved"| F["Dashboard ✅"]
+    E -->|"pending"| G["Waiting Room ⏳"]
+    E -->|"no IEEE ID"| H["Complete Registration"]
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**New users must be approved** by an Admin or MDO before accessing the portal. Pre-approved IEEE Membership IDs skip the queue automatically.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+→ **Full details:** [docs/AUTH.md](docs/AUTH.md)
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🗄️ Database
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The database uses **PostgreSQL via Supabase** with a permission-based access control system.
+
+### Key Tables
+
+| Table | Purpose |
+|-------|---------|
+| `profiles` | User identity, status, IEEE membership |
+| `branches` | IEEE organizational hierarchy (SBNU → CS, WIE, SIGHT, etc.) |
+| `positions` | Branch-scoped titles (Chair, Vice Chair, MDO, etc.) |
+| `permissions` | Atomic actions (create_events, approve_registrations, etc.) |
+| `memberships` | Append-only history: who held what position, when |
+| `events` | Core event entity with status machine |
+| `event_approvals` | Multi-level approval tracking |
+
+### Branches (Seeded)
+
+| Branch | Slug | Parent |
+|--------|------|--------|
+| IEEE SBNU | `sbnu` | — (root) |
+| IEEE SIGHT | `sight` | SBNU |
+| IEEE WIE | `wie` | SBNU |
+| IEEE CS | `cs` | SBNU |
+| IEEE ITSS | `itss` | SBNU |
+| IEEE SPS | `sps` | SBNU |
+
+→ **Full schema reference:** [docs/SCHEMA.md](docs/SCHEMA.md)
+
+---
+
+## 🛡️ Permission System
+
+Permissions are **position-based + direct grants**. The system follows the principle of least privilege.
+
+| Permission | Chair | Vice Chair | Gen Sec | Tech Head | Creative Head | MDO |
+|:-----------|:-----:|:----------:|:-------:|:---------:|:-------------:|:---:|
+| `create_events` | ✅ | ✅ | ✅ | ✅ | ✅ | |
+| `approve_events` | ✅ | ✅ | | | | |
+| `manage_events` | ✅ | ✅ | | | | |
+| `manage_members` | ✅ | ✅ | | | | |
+| `approve_registrations` | ✅ | ✅ | | | | ✅ |
+| `view_members` | ✅ | ✅ | | ✅ | ✅ | ✅ |
+| `view_audit_log` | ✅ | ✅ | ✅ | | | |
+
+> New positions (Treasurer, Web Master, Technical Associate, Marketing Associate) start with no default permissions. An admin can grant them via the Manage Members module.
+
+→ **Full permission engine details:** [docs/AUTH.md#6-permission-engine](docs/AUTH.md#6-permission-engine)
+
+---
+
+## 🚢 Deployment
+
+The app is deployed on **Vercel** with auto-deploys from the `main` branch.
+
+| Environment | URL |
+|-------------|-----|
+| **Production (Vercel)** | [atrium-ieeenirma.vercel.app](https://atrium-ieeenirma.vercel.app) |
+| **Custom Domain** | [atrium.ieeenirma.org](https://atrium.ieeenirma.org) |
+| **Local** | [localhost:3000](http://localhost:3000) |
+
+### Vercel Environment Variables
+
+Set all variables from the `.env` section above in **Vercel → Project Settings → Environment Variables**. For production, update:
+
+```
+NEXTAUTH_URL=https://atrium-ieeenirma.vercel.app
+NEXT_PUBLIC_APP_URL=https://atrium-ieeenirma.vercel.app
+```
+
+### Google OAuth Production URIs
+
+In the Google Cloud Console, add these to your OAuth Client:
+
+- **Authorized JavaScript Origins:** `https://atrium-ieeenirma.vercel.app`, `https://atrium.ieeenirma.org`
+- **Authorized Redirect URIs:** `https://atrium-ieeenirma.vercel.app/api/auth/callback/google`, `https://atrium.ieeenirma.org/api/auth/callback/google`
+
+---
+
+## 📜 Migration History
+
+| # | Migration | Description |
+|---|-----------|-------------|
+| 1 | `00001_initial_schema.sql` | Core tables: profiles, branches, positions, memberships, events, event_types, event_approvals, audit logs. Seeded branches and positions. |
+| 2 | `00002_permission_system.sql` | Permission engine: permissions, position_permissions, member_permissions, pre_approved_members. Dropped old portal_role enum. Full permission matrix seed. |
+| 3 | `00003_nextauth_migration.sql` | Added password_hash to profiles. NextAuth compatibility columns. |
+| 4 | `00004_invisible_superadmin.sql` | Created superadmins table with bcrypt-hashed emails and passphrases. |
+
+---
+
+## 🧑‍💻 Development
+
+### Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server (hot reload) |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+
+### Adding shadcn/ui Components
+
+```bash
+npx shadcn@latest add <component-name>
+```
+
+### Code Conventions
+
+- **Server Actions** for all mutations (no API routes for forms)
+- **Server Components** by default; `'use client'` only when needed
+- **Supabase Admin Client** for all DB access (never browser client)
+- **bcrypt** for password hashing (Node.js runtime only)
+- **JWT sessions** (no database sessions)
+
+---
+
+## 👥 Team
+
+**IEEE Student Branch of Nirma University**
+
+- Organization: [IEEE-Student-Branch-NU](https://github.com/IEEE-Student-Branch-NU)
+- Repository: [Atrium](https://github.com/IEEE-Student-Branch-NU/Atrium)
+
+---
+
+<div align="center">
+  <sub>Built with ❤️ by IEEE SBNU</sub>
+</div>

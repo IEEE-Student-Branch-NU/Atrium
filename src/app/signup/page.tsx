@@ -153,12 +153,67 @@ export default function SignupPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
+                  <Label htmlFor="branch">
+                    Branch <span className="text-destructive">*</span>
+                  </Label>
+                  <select
+                    id="branch"
+                    name="branch"
+                    required
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="sbnu" className="bg-background">IEEE SBNU</option>
+                    <option value="sight" className="bg-background">IEEE SIGHT</option>
+                    <option value="wie" className="bg-background">IEEE WIE</option>
+                    <option value="cs" className="bg-background">IEEE CS</option>
+                    <option value="itss" className="bg-background">IEEE ITSS</option>
+                    <option value="sps" className="bg-background">IEEE SPS</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="role">
+                    Role <span className="text-destructive">*</span>
+                  </Label>
+                  <select
+                    id="role"
+                    name="role"
+                    required
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="Member" className="bg-background">Member</option>
+                    <option value="Chair" className="bg-background">Chair</option>
+                    <option value="Vice Chair" className="bg-background">Vice Chair</option>
+                    <option value="General Secretary" className="bg-background">General Secretary</option>
+                    <option value="Technical Head" className="bg-background">Technical Head</option>
+                    <option value="Creative Head" className="bg-background">Creative Head</option>
+                    <option value="Treasurer" className="bg-background">Treasurer</option>
+                    <option value="Web Master" className="bg-background">Web Master</option>
+                    <option value="Technical Associate" className="bg-background">Technical Associate</option>
+                    <option value="Marketing Associate" className="bg-background">Marketing Associate</option>
+                    <option value="MDO" className="bg-background">MDO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
                     name="phone"
                     type="tel"
                     placeholder="+91 XXXXX XXXXX"
+                    pattern="\+91\s\d{5}\s\d{5}"
+                    title="Format: +91 XXXXX XXXXX"
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/[^\d]/g, '');
+                      if (val.startsWith('91')) val = val.substring(2);
+                      if (val.length > 10) val = val.substring(0, 10);
+                      let formatted = val.length > 0 ? '+91' : '';
+                      if (val.length > 0) formatted += ' ' + val.substring(0, 5);
+                      if (val.length > 5) formatted += ' ' + val.substring(5, 10);
+                      e.target.value = formatted;
+                    }}
                   />
                 </div>
                 <div className="space-y-1.5">

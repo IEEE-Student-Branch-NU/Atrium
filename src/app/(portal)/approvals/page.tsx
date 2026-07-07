@@ -1,0 +1,34 @@
+import { redirect } from 'next/navigation'
+import { auth } from '@/auth'
+import { createAdminClient } from '@/utils/supabase/server'
+import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
+import { getUserProfileWithMembership, getPendingRegistrations, getApprovalHistory } from '@/lib/queries'
+import { ApprovalsClient } from './client'
+
+export const metadata = {
+  title: 'Approvals | Atrium',
+}
+
+export default async function ApprovalsPage() {
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
+
+  const profile = await getUserProfileWithMembership(session.user.id)
+  if (!profile) redirect('/login')
+
+  const supabase = createAdminClient()
+  const permissions = await getUserPermissions(supabase, profile.id, profile.branch_id ?? '')
+  
+  // Guard
+  if (!hasPermission(permissions, 'approve_registrations')) {
+    redirect('/')
+  }
+
+  // Fetch data
+  const [pending, history] = await Promise.all([
+    getPendingRegistrations(),
+    getApprovalHistory(50),
+  ])
+
+  return <ApprovalsClient pending={pending} history={history} />
+}

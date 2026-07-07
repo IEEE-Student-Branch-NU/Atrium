@@ -292,6 +292,7 @@ In the Google Cloud Console, add these to your OAuth Client:
 | 2 | `00002_permission_system.sql` | Permission engine: permissions, position_permissions, member_permissions, pre_approved_members. Dropped old portal_role enum. Full permission matrix seed. |
 | 3 | `00003_nextauth_migration.sql` | Added password_hash to profiles. NextAuth compatibility columns. |
 | 4 | `00004_invisible_superadmin.sql` | Created superadmins table with bcrypt-hashed emails and passphrases. |
+| 5 | `00005_new_positions.sql` | Seed script for adding missing standard roles: Web Master, Treasurer, Technical Associate, Marketing Associate, and granting basic permissions. |
 
 ---
 

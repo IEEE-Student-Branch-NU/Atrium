@@ -15,19 +15,20 @@ export type PermissionName =
 const WILDCARD = '*'
 
 /**
- * Fetches all permissions a user has in a specific branch.
+ * Fetches all permissions a user has for a specific workspace (membership).
  *
- * Permission sources (in order of precedence):
- * 1. SuperAdmin flag on profiles → returns ['*'] (all permissions)
- * 2. Position-based permissions → from position_permissions via active membership
- * 3. Direct grants → from member_permissions (ad-hoc overrides)
+ * Workspace-scoped permission resolution:
+ * 1. SuperAdmin flag → returns ['*'] (all permissions)
+ * 2. Position-based permissions → from the specific membership's position ONLY
+ * 3. Direct grants → from member_permissions matching the membership's branch
  *
- * Results are deduplicated and returned as an array of permission name strings.
+ * Permissions are NEVER merged across workspaces. Each workspace is independent.
  */
 export async function getUserPermissions(
   supabase: SupabaseClient,
   profileId: string,
-  branchId: string
+  branchId: string,
+  membershipId?: string | null
 ): Promise<string[]> {
   // 1. Check SuperAdmin bypass from signed secure cookie
   if (await isSudoMode()) {
@@ -36,24 +37,22 @@ export async function getUserPermissions(
 
   const permissionNames: string[] = []
 
-  // 2. Get position-based permissions via active memberships
-  const { data: memberships } = await supabase
-    .from('memberships')
-    .select('position_id')
-    .eq('profile_id', profileId)
-    .eq('branch_id', branchId)
-    .is('ended_at', null)
+  // 2. Get position-based permissions
+  if (membershipId) {
+    // Workspace-scoped: only the active membership's position
+    const { data: membership } = await supabase
+      .from('memberships')
+      .select('position_id')
+      .eq('id', membershipId)
+      .eq('profile_id', profileId)
+      .is('ended_at', null)
+      .single()
 
-  if (memberships && memberships.length > 0) {
-    const positionIds = memberships
-      .map((m) => m.position_id)
-      .filter(Boolean) as string[]
-
-    if (positionIds.length > 0) {
+    if (membership?.position_id) {
       const { data: posPerms } = await supabase
         .from('position_permissions')
         .select('permission_id, permissions!inner(name)')
-        .in('position_id', positionIds)
+        .eq('position_id', membership.position_id)
 
       if (posPerms) {
         for (const pp of posPerms) {
@@ -64,9 +63,39 @@ export async function getUserPermissions(
         }
       }
     }
+  } else {
+    // Legacy fallback: all active memberships in the branch (backward compat)
+    const { data: memberships } = await supabase
+      .from('memberships')
+      .select('position_id')
+      .eq('profile_id', profileId)
+      .eq('branch_id', branchId)
+      .is('ended_at', null)
+
+    if (memberships && memberships.length > 0) {
+      const positionIds = memberships
+        .map((m) => m.position_id)
+        .filter(Boolean) as string[]
+
+      if (positionIds.length > 0) {
+        const { data: posPerms } = await supabase
+          .from('position_permissions')
+          .select('permission_id, permissions!inner(name)')
+          .in('position_id', positionIds)
+
+        if (posPerms) {
+          for (const pp of posPerms) {
+            const perm = pp.permissions as unknown as { name: string }
+            if (perm?.name) {
+              permissionNames.push(perm.name)
+            }
+          }
+        }
+      }
+    }
   }
 
-  // 3. Get direct permission grants
+  // 3. Get direct permission grants (always branch-scoped)
   const { data: directPerms } = await supabase
     .from('member_permissions')
     .select('permission_id, permissions!inner(name)')
@@ -106,9 +135,10 @@ export async function checkPermission(
   supabase: SupabaseClient,
   profileId: string,
   branchId: string,
-  required: PermissionName
+  required: PermissionName,
+  membershipId?: string | null
 ): Promise<boolean> {
-  const permissions = await getUserPermissions(supabase, profileId, branchId)
+  const permissions = await getUserPermissions(supabase, profileId, branchId, membershipId)
   return hasPermission(permissions, required)
 }
 

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Notification } from '@/lib/queries'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Bell, Check, Clock, ExternalLink, Send } from 'lucide-react'
+import { Bell, Check, Clock, ExternalLink, Send, Info, AlertTriangle, CheckCircle, XCircle, Megaphone } from 'lucide-react'
 import { markAsRead, markAllAsRead, sendBroadcast } from './actions'
 import { cn } from '@/lib/utils'
 import {
@@ -20,6 +20,43 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+function getNotificationStyle(type: string, isRead: boolean) {
+  switch (type) {
+    case 'broadcast':
+      return {
+        icon: Megaphone,
+        colorClass: isRead ? 'text-purple-500/60' : 'text-purple-500',
+        bgClass: isRead ? 'bg-purple-500/10' : 'bg-purple-500/20 border-purple-500/30'
+      }
+    case 'warning':
+      return {
+        icon: AlertTriangle,
+        colorClass: isRead ? 'text-orange-500/60' : 'text-orange-500',
+        bgClass: isRead ? 'bg-orange-500/10' : 'bg-orange-500/20 border-orange-500/30'
+      }
+    case 'success':
+      return {
+        icon: CheckCircle,
+        colorClass: isRead ? 'text-emerald-500/60' : 'text-emerald-500',
+        bgClass: isRead ? 'bg-emerald-500/10' : 'bg-emerald-500/20 border-emerald-500/30'
+      }
+    case 'error':
+      return {
+        icon: XCircle,
+        colorClass: isRead ? 'text-red-500/60' : 'text-red-500',
+        bgClass: isRead ? 'bg-red-500/10' : 'bg-red-500/20 border-red-500/30'
+      }
+    case 'normal':
+    default:
+      return {
+        icon: Info,
+        colorClass: isRead ? 'text-blue-500/60' : 'text-blue-500',
+        bgClass: isRead ? 'bg-blue-500/10' : 'bg-blue-500/20 border-blue-500/30'
+      }
+  }
+}
 
 export function NotificationsClient({ 
   notifications, 
@@ -83,29 +120,31 @@ export function NotificationsClient({
             </CardContent>
           </Card>
         ) : (
-          notifications.map((notification) => (
+          notifications.map((notification) => {
+            const style = getNotificationStyle(notification.type, notification.is_read)
+            const Icon = style.icon
+            
+            return (
             <Card 
               key={notification.id} 
               className={cn(
                 "transition-colors",
-                !notification.is_read ? "bg-sidebar-primary/5 border-sidebar-primary/20" : "bg-card/50 border-border/50 opacity-70"
+                !notification.is_read ? style.bgClass : "bg-card/50 border-border/50 opacity-70"
               )}
             >
               <CardContent className="flex flex-col sm:flex-row gap-4 p-4 sm:p-5">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
-                    {!notification.is_read && (
-                      <span className="flex h-2 w-2 rounded-full bg-sidebar-primary shrink-0" />
-                    )}
+                    <Icon className={cn("h-5 w-5", style.colorClass)} />
                     <h4 className={cn("text-base font-semibold", !notification.is_read ? "text-foreground" : "text-foreground/80")}>
                       {notification.title}
                     </h4>
                   </div>
-                  <p className="text-sm text-muted-foreground/90 pl-4 sm:pl-0">
+                  <p className="text-sm text-muted-foreground/90 pl-7 sm:pl-7">
                     {notification.message}
                   </p>
                   
-                  <div className="flex items-center gap-4 mt-2 pl-4 sm:pl-0 text-xs text-muted-foreground/70">
+                  <div className="flex items-center gap-4 mt-2 pl-7 sm:pl-7 text-xs text-muted-foreground/70">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {new Date(notification.created_at).toLocaleString('en-IN', {
@@ -131,7 +170,7 @@ export function NotificationsClient({
                   </div>
                 </div>
                 
-                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center pl-4 sm:pl-0">
+                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center pl-7 sm:pl-0">
                   {!notification.is_read && (
                     <Button 
                       variant="ghost" 
@@ -147,7 +186,7 @@ export function NotificationsClient({
                 </div>
               </CardContent>
             </Card>
-          ))
+          )})
         )}
       </div>
     </div>
@@ -193,6 +232,21 @@ function BroadcastDialog() {
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input id="title" name="title" placeholder="e.g. System Maintenance" required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="type">Notification Type</Label>
+            <Select name="type" defaultValue="broadcast">
+              <SelectTrigger>
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="normal">Normal (Blue)</SelectItem>
+                <SelectItem value="broadcast">Broadcast (Purple)</SelectItem>
+                <SelectItem value="warning">Warning / Action Req (Orange)</SelectItem>
+                <SelectItem value="success">Success (Green)</SelectItem>
+                <SelectItem value="error">Error (Red)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="message">Message</Label>

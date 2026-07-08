@@ -57,6 +57,7 @@ export async function sendBroadcast(formData: FormData) {
   const title = formData.get('title') as string
   const message = formData.get('message') as string
   const link = formData.get('link') as string || null
+  const type = (formData.get('type') as string) || 'broadcast'
 
   if (!title || !message) {
     return { error: 'Title and message are required.' }
@@ -77,6 +78,7 @@ export async function sendBroadcast(formData: FormData) {
     title,
     message,
     link,
+    type,
     is_read: false
   }))
 

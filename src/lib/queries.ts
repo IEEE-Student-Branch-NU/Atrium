@@ -280,7 +280,7 @@ export interface Notification {
 export async function getUnreadNotifications(profileId: string): Promise<Notification[]> {
   const supabase = createAdminClient()
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('notifications')
     .select('id, title, message, link, is_read, type, created_at')
     .eq('profile_id', profileId)
@@ -288,19 +288,21 @@ export async function getUnreadNotifications(profileId: string): Promise<Notific
     .order('created_at', { ascending: false })
     .limit(20)
 
+  if (error) console.error('Error fetching unread notifications:', error)
   return data ?? []
 }
 
 export async function getNotifications(profileId: string, limit = 50): Promise<Notification[]> {
   const supabase = createAdminClient()
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('notifications')
     .select('id, title, message, link, is_read, type, created_at')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false })
     .limit(limit)
 
+  if (error) console.error('Error fetching notifications:', error)
   return data ?? []
 }
 

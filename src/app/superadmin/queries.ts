@@ -274,3 +274,50 @@ export async function listPositionsGrouped(): Promise<PositionGroup[]> {
   }
   return [...groups.values()].sort((a, b) => a.branchName.localeCompare(b.branchName))
 }
+
+// ── Position Requests (decided history) ─────────────────────
+// The pending queue reuses `getPendingPositionRequests()` from
+// `@/lib/queries` (already all-branch). This covers the read-only history
+// of already-decided requests shown below it on the super-admin page.
+
+export type DecidedPositionRequest = {
+  id: string
+  profile_name: string | null
+  profile_email: string
+  branch_name: string
+  position_name: string
+  status: string
+  admin_comment: string | null
+  decided_by_name: string | null
+  decided_at: string | null
+  created_at: string
+}
+
+export async function getRecentDecidedPositionRequests(limit = 25): Promise<DecidedPositionRequest[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('position_requests')
+    .select(`
+      id, status, admin_comment, decided_at, created_at,
+      profiles!position_requests_profile_id_fkey(full_name, email),
+      branches(name),
+      positions(name),
+      decided_by:profiles!position_requests_decided_by_fkey(full_name)
+    `)
+    .in('status', ['approved', 'rejected'])
+    .order('decided_at', { ascending: false })
+    .limit(limit)
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    profile_name: (r.profiles as unknown as { full_name: string | null } | null)?.full_name ?? null,
+    profile_email: (r.profiles as unknown as { email: string | null } | null)?.email ?? '',
+    branch_name: (r.branches as unknown as { name: string } | null)?.name ?? 'Unknown',
+    position_name: (r.positions as unknown as { name: string } | null)?.name ?? 'Unknown',
+    status: r.status,
+    admin_comment: r.admin_comment,
+    decided_by_name: (r.decided_by as unknown as { full_name: string | null } | null)?.full_name ?? null,
+    decided_at: r.decided_at,
+    created_at: r.created_at,
+  }))
+}

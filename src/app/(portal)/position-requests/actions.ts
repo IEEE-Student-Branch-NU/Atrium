@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { getActiveWorkspace } from '@/utils/auth/workspace'
 import { getUserProfileWithMembership } from '@/lib/queries'
+import { logAdminAction } from '@/utils/auth/audit'
 
 export async function approvePositionRequest(requestId: string, adminComment?: string) {
   const session = await auth()
@@ -107,6 +108,18 @@ export async function approvePositionRequest(requestId: string, adminComment?: s
     },
   })
 
+  // Super-admin audit trail — additive only; does not affect branch-admin flow.
+  if (session?.isSuperAdmin) {
+    await logAdminAction({
+      actorProfileId: session.user!.id,
+      action: 'position_request_approved',
+      entityType: 'membership',
+      entityId: requestId,
+      summary: 'Decided a position request',
+      details: null,
+    })
+  }
+
   revalidatePath('/position-requests')
   revalidatePath('/profile')
   return { success: true }
@@ -169,6 +182,18 @@ export async function rejectPositionRequest(requestId: string, reason: string) {
     message: `Your request for a new position was rejected. Reason: ${reason.trim()}`,
     link: '/profile#positions',
   })
+
+  // Super-admin audit trail — additive only; does not affect branch-admin flow.
+  if (session?.isSuperAdmin) {
+    await logAdminAction({
+      actorProfileId: session.user!.id,
+      action: 'position_request_rejected',
+      entityType: 'membership',
+      entityId: requestId,
+      summary: 'Decided a position request',
+      details: null,
+    })
+  }
 
   revalidatePath('/position-requests')
   revalidatePath('/profile')

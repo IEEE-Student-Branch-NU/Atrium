@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/utils/supabase/server'
+import { sanitizeSearchTerm } from '@/utils/search'
 
 // ── Stats ────────────────────────────────────────────────────
 
@@ -183,20 +184,10 @@ export type UserGrantRow = {
 
 export type PermissionRow = { id: string; name: string; description: string | null }
 
-/**
- * `listUsers`'s search term is spliced directly into a raw PostgREST
- * `.or(...)` filter string below. Commas separate conditions and
- * parentheses group them in that mini-language, so an unescaped one typed
- * into the search box could inject extra clauses or unbalance the filter.
- * `%`/`_` are SQL ILIKE wildcards, stripped so a search can't be broadened
- * beyond a literal substring match. Stripping (rather than escaping) is
- * sufficient here since the search box only needs literal substring
- * matching, not literal-wildcard search.
- */
-function sanitizeSearchTerm(raw: string): string {
-  return raw.replace(/[,()%_]/g, '').trim()
-}
-
+// `listUsers` splices the search term into a raw PostgREST `.or(...ilike...)`
+// filter string below, so the term is passed through `sanitizeSearchTerm`
+// (see @/utils/search) which strips the `.or()` structural chars + the `*`
+// wildcard alias and backslash-escapes ILIKE `%`/`_` so they match literally.
 export async function listUsers(opts: {
   search?: string
   status?: string

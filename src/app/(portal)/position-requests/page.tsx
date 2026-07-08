@@ -16,7 +16,9 @@ export default async function PositionRequestsPage() {
   if (!session?.user?.id) redirect('/login')
 
   const actor = await getEffectiveActor()
-  const activeWorkspaceId = await getActiveWorkspace()
+  const activeWorkspaceId = actor.isImpersonating
+    ? actor.actingMembershipId
+    : await getActiveWorkspace()
   const profile = await getUserProfileWithMembership(actor.actingProfileId!, activeWorkspaceId)
   if (!profile || !profile.branch_id) redirect('/login')
 

@@ -23,7 +23,7 @@ export default async function ProfilePage() {
     getFullUserProfile(actor.actingProfileId!),
     getUserPositionRequests(actor.actingProfileId!),
     getAllBranches(),
-    getActiveWorkspace(),
+    actor.isImpersonating ? actor.actingMembershipId : getActiveWorkspace(),
   ])
 
   if (!profile) {

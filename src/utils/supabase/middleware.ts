@@ -30,6 +30,21 @@ export async function authMiddleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Edge-safe super-admin flag, set on the session by the `jwt`/`session`
+  // callbacks in `auth.config.ts` (Task 3). Never call `isSuperAdmin()` from
+  // `@/utils/auth/superadmin` here — it uses bcrypt, which is not Edge-safe.
+  const isSA = session?.isSuperAdmin === true
+
+  // Block non-super-admins from the portal entirely.
+  if (pathname.startsWith('/superadmin') && !isSA) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  // Route super admins straight into their portal from the app root.
+  if (isSA && pathname === '/') {
+    return NextResponse.redirect(new URL('/superadmin', request.url))
+  }
+
   // Logged in + on login/signup → redirect based on status
   if (session?.user && (pathname === '/login' || pathname === '/signup')) {
     const supabase = createAdminClient()

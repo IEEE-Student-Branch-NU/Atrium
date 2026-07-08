@@ -321,6 +321,17 @@ npx shadcn@latest add <component-name>
 - **bcrypt** for password hashing (Node.js runtime only)
 - **JWT sessions** (no database sessions)
 
+## 🤖 AI Agents & Graphify
+
+This repository is configured to be used with AI coding assistants (like Claude, Cursor, Aider, Copilot, or Antigravity) using **Graphify**. 
+Graphify maps the codebase into a queryable knowledge graph, giving your AI agents a deep understanding of the project's architecture and inter-dependencies out-of-the-box.
+
+When you clone the repository, open it in your AI coding assistant of choice and run:
+```bash
+/graphify .
+```
+(Or run `graphify extract .` via CLI). The agent will automatically use the generated graph for all codebase-related questions.
+
 ---
 
 ## 👥 Team

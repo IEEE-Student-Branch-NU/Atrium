@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
+import { getEffectiveActor } from '@/utils/auth/superadmin'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { getUserProfileWithMembership, getPendingPositionRequests } from '@/lib/queries'
@@ -14,8 +15,9 @@ export default async function PositionRequestsPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
+  const actor = await getEffectiveActor()
   const activeWorkspaceId = await getActiveWorkspace()
-  const profile = await getUserProfileWithMembership(session.user.id, activeWorkspaceId)
+  const profile = await getUserProfileWithMembership(actor.actingProfileId!, activeWorkspaceId)
   if (!profile || !profile.branch_id) redirect('/login')
 
   const supabase = createAdminClient()

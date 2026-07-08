@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+import { getEffectiveActor } from '@/utils/auth/superadmin'
 import { getFullUserProfile, getUserPositionRequests, getAllBranches } from '@/lib/queries'
 import { getActiveWorkspace } from '@/utils/auth/workspace'
 import { ProfileClient } from './client'
@@ -16,9 +17,11 @@ export default async function ProfilePage() {
     redirect('/login')
   }
 
+  const actor = await getEffectiveActor()
+
   const [profile, myRequests, branches, activeWorkspaceId] = await Promise.all([
-    getFullUserProfile(session.user.id),
-    getUserPositionRequests(session.user.id),
+    getFullUserProfile(actor.actingProfileId!),
+    getUserPositionRequests(actor.actingProfileId!),
     getAllBranches(),
     getActiveWorkspace(),
   ])

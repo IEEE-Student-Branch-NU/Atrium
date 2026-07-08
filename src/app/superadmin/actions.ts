@@ -234,3 +234,79 @@ export async function revokePermission(formData: FormData) {
   }
   return { success: true }
 }
+
+// ── Positions ────────────────────────────────────────────────
+
+export async function createPosition(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const branch_id = String(formData.get('branch_id') ?? '')
+  const name = String(formData.get('name') ?? '').trim()
+  if (!branch_id || !name) return { error: 'Branch and name are required' }
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.from('positions').insert({ branch_id, name }).select('id').single()
+  if (error) return { error: error.message }
+  await logAdminAction({
+    actorProfileId: session.user!.id, action: 'position_created', entityType: 'position',
+    entityId: data.id, branchId: branch_id, summary: `Created position "${name}"`, details: null,
+  })
+  revalidatePath('/superadmin/positions')
+  return { success: true }
+}
+
+export async function updatePosition(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const id = String(formData.get('id') ?? '')
+  const name = String(formData.get('name') ?? '').trim()
+  if (!id || !name) return { error: 'Name required' }
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('positions').update({ name }).eq('id', id)
+  if (error) return { error: error.message }
+  await logAdminAction({
+    actorProfileId: session.user!.id, action: 'position_updated', entityType: 'position',
+    entityId: id, summary: `Renamed a position to "${name}"`, details: null,
+  })
+  revalidatePath('/superadmin/positions')
+  return { success: true }
+}
+
+export async function deletePosition(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const id = String(formData.get('id') ?? '')
+  if (!id) return { error: 'Position required' }
+  const supabase = createAdminClient()
+  // Block delete if any active membership uses it.
+  const { count } = await supabase.from('memberships')
+    .select('id', { count: 'exact', head: true }).eq('position_id', id).is('ended_at', null)
+  if ((count ?? 0) > 0) return { error: 'Position is held by active members; remove them first.' }
+  const { error } = await supabase.from('positions').delete().eq('id', id)
+  if (error) return { error: error.message }
+  await logAdminAction({
+    actorProfileId: session.user!.id, action: 'position_deleted', entityType: 'position',
+    entityId: id, summary: `Deleted a position`, details: null,
+  })
+  revalidatePath('/superadmin/positions')
+  return { success: true }
+}
+
+export async function setPositionPermissions(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const position_id = String(formData.get('position_id') ?? '')
+  const permission_ids = formData.getAll('permission_ids').map(String)
+  if (!position_id) return { error: 'Position required' }
+  const supabase = createAdminClient()
+  await supabase.from('position_permissions').delete().eq('position_id', position_id)
+  if (permission_ids.length > 0) {
+    await supabase.from('position_permissions')
+      .insert(permission_ids.map((permission_id) => ({ position_id, permission_id })))
+  }
+  await logAdminAction({
+    actorProfileId: session.user!.id, action: 'position_permissions_set', entityType: 'position',
+    entityId: position_id, summary: `Updated position permissions`, details: { count: permission_ids.length },
+  })
+  revalidatePath('/superadmin/positions')
+  return { success: true }
+}

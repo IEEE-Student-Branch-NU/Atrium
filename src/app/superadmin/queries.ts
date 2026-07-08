@@ -242,3 +242,35 @@ export async function getAllPermissions(): Promise<PermissionRow[]> {
   const { data } = await supabase.from('permissions').select('id, name, description').order('name')
   return data ?? []
 }
+
+// ── Positions ────────────────────────────────────────────────
+
+export type PositionGroup = {
+  branchId: string; branchName: string
+  positions: { id: string; name: string; permissionIds: string[] }[]
+}
+
+export async function listPositionsGrouped(): Promise<PositionGroup[]> {
+  const supabase = createAdminClient()
+  const { data: positions } = await supabase
+    .from('positions').select('id, name, branch_id, branches(name)').order('name')
+  const { data: pp } = await supabase.from('position_permissions').select('position_id, permission_id')
+
+  const permsByPosition = new Map<string, string[]>()
+  for (const row of pp ?? []) {
+    const arr = permsByPosition.get(row.position_id) ?? []
+    arr.push(row.permission_id)
+    permsByPosition.set(row.position_id, arr)
+  }
+  const groups = new Map<string, PositionGroup>()
+  for (const p of positions ?? []) {
+    const g: PositionGroup = groups.get(p.branch_id) ?? {
+      branchId: p.branch_id,
+      branchName: (p.branches as unknown as { name: string } | null)?.name ?? '',
+      positions: [],
+    }
+    g.positions.push({ id: p.id, name: p.name, permissionIds: permsByPosition.get(p.id) ?? [] })
+    groups.set(p.branch_id, g)
+  }
+  return [...groups.values()].sort((a, b) => a.branchName.localeCompare(b.branchName))
+}

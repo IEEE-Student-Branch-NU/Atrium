@@ -15,7 +15,7 @@ export type AdminAction = {
 export async function logAdminAction(a: AdminAction): Promise<void> {
   try {
     const supabase = createAdminClient()
-    await supabase.from('audit_log').insert({
+    const { error } = await supabase.from('audit_log').insert({
       actor_profile_id: a.actorProfileId,
       action: a.action,
       entity_type: a.entityType,
@@ -24,6 +24,7 @@ export async function logAdminAction(a: AdminAction): Promise<void> {
       summary: a.summary,
       details: a.details ?? null,
     })
+    if (error) console.error('logAdminAction failed', error)
   } catch (e) {
     console.error('logAdminAction failed', e)
   }

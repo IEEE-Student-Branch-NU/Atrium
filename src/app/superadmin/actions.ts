@@ -277,10 +277,15 @@ export async function deletePosition(formData: FormData) {
   const id = String(formData.get('id') ?? '')
   if (!id) return { error: 'Position required' }
   const supabase = createAdminClient()
-  // Block delete if any active membership uses it.
-  const { count } = await supabase.from('memberships')
-    .select('id', { count: 'exact', head: true }).eq('position_id', id).is('ended_at', null)
-  if ((count ?? 0) > 0) return { error: 'Position is held by active members; remove them first.' }
+  // `memberships.position_id` is FK RESTRICT (no ON DELETE) — a raw delete throws
+  // an FK violation for ANY position that has ever been assigned (active OR ended).
+  // Count ALL referencing memberships and fail closed if the count query errors.
+  const { count, error: countError } = await supabase.from('memberships')
+    .select('id', { count: 'exact', head: true }).eq('position_id', id)
+  if (countError) return { error: countError.message }
+  if ((count ?? 0) > 0) {
+    return { error: 'Cannot delete: this position has membership history. End and reassign those members first.' }
+  }
   const { error } = await supabase.from('positions').delete().eq('id', id)
   if (error) return { error: error.message }
   await logAdminAction({
@@ -298,10 +303,17 @@ export async function setPositionPermissions(formData: FormData) {
   const permission_ids = formData.getAll('permission_ids').map(String)
   if (!position_id) return { error: 'Position required' }
   const supabase = createAdminClient()
-  await supabase.from('position_permissions').delete().eq('position_id', position_id)
+  // Non-atomic across two REST calls: the delete clears existing mappings first,
+  // so an insert failure must be surfaced (not swallowed) or the position is left
+  // with zero permissions. An admin retry recovers; true atomicity would need a
+  // Postgres RPC (out of scope).
+  const { error: deleteError } = await supabase.from('position_permissions')
+    .delete().eq('position_id', position_id)
+  if (deleteError) return { error: deleteError.message }
   if (permission_ids.length > 0) {
-    await supabase.from('position_permissions')
+    const { error: insertError } = await supabase.from('position_permissions')
       .insert(permission_ids.map((permission_id) => ({ position_id, permission_id })))
+    if (insertError) return { error: insertError.message }
   }
   await logAdminAction({
     actorProfileId: session.user!.id, action: 'position_permissions_set', entityType: 'position',

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
-import { getNotifications } from '@/lib/queries'
+import { getNotifications, getFullUserProfile } from '@/lib/queries'
 import { NotificationsClient } from './client'
 
 export const metadata = {
@@ -11,7 +11,12 @@ export default async function NotificationsPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
-  const notifications = await getNotifications(session.user.id, 50)
+  const [notifications, profile] = await Promise.all([
+    getNotifications(session.user.id, 50),
+    getFullUserProfile(session.user.id)
+  ])
+  
+  const isAdmin = profile?.is_super_admin || false
 
-  return <NotificationsClient notifications={notifications} />
+  return <NotificationsClient notifications={notifications} isAdmin={isAdmin} />
 }

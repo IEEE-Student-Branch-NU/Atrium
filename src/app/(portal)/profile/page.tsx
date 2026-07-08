@@ -46,7 +46,6 @@ export default async function ProfilePage() {
         myRequests={myRequests}
         branches={branches}
         activeMembershipId={activeWorkspaceId}
-        hasPasswordAuth={hasPasswordAuth}
       />
     </div>
   )

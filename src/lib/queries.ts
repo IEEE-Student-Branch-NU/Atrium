@@ -210,6 +210,7 @@ export interface FullUserProfile {
   skills: string[] | null
   status: string
   is_super_admin: boolean
+  has_password?: boolean
   created_at: string
   memberships: {
     id: string
@@ -228,21 +229,29 @@ export async function getFullUserProfile(profileId: string): Promise<FullUserPro
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, section, bio, skills, status, is_super_admin, created_at')
+    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, section, bio, skills, status, is_super_admin, created_at, password_hash')
     .eq('id', profileId)
     .single()
 
   if (!profile) return null
 
+  const has_password = !!profile.password_hash
+  delete (profile as any).password_hash
+
   // All memberships (active + historical)
-  const { data: memberships } = await supabase
+  const { data: memberships, error: memError } = await supabase
     .from('memberships')
     .select('id, assigned_at, ended_at, branches(name, slug), positions(name), profiles!memberships_assigned_by_fkey(full_name)')
     .eq('profile_id', profileId)
     .order('assigned_at', { ascending: false })
 
+  if (memError) {
+    console.error('Error fetching memberships:', memError)
+  }
+
   return {
     ...profile,
+    has_password,
     memberships: (memberships ?? []).map((m) => ({
       id: m.id,
       branch_name: (m.branches as any)?.name ?? 'Unknown',

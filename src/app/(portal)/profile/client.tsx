@@ -29,6 +29,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card'
 import {
   Dialog,
@@ -48,6 +49,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { updateProfile, changePassword, requestPosition } from './actions'
+import { switchWorkspace } from '@/app/(portal)/actions'
 import type { FullUserProfile, PositionRequest, BranchOption, PositionOption } from '@/lib/queries'
 
 // ── Types ────────────────────────────────────────────────────
@@ -57,7 +59,6 @@ interface ProfileClientProps {
   myRequests: PositionRequest[]
   branches: BranchOption[]
   activeMembershipId: string | null
-  hasPasswordAuth: boolean
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -116,7 +117,7 @@ function EditProfileDialog({ profile }: { profile: FullUserProfile }) {
         <Edit3 className="h-3.5 w-3.5" />
         Edit Profile
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Profile</DialogTitle>
           <DialogDescription>Update your personal information</DialogDescription>
@@ -153,7 +154,7 @@ function EditProfileDialog({ profile }: { profile: FullUserProfile }) {
 
 // ── Change Password Dialog ───────────────────────────────────
 
-function ChangePasswordDialog() {
+function ChangePasswordDialog({ hasPassword }: { hasPassword: boolean }) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -173,22 +174,27 @@ function ChangePasswordDialog() {
     })
   }
 
+  const title = hasPassword ? 'Change Password' : 'Set Password'
+  const description = hasPassword ? 'Enter your current and new password' : 'Create a password for your account'
+
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); setError(null); setSuccess(false) }}>
       <DialogTrigger render={<Button variant="outline" size="sm" className="gap-2" />}>
         <Lock className="h-3.5 w-3.5" />
-        Change Password
+        {title}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Change Password</DialogTitle>
-          <DialogDescription>Enter your current and new password</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="currentPassword">Current Password</Label>
-            <Input id="currentPassword" name="currentPassword" type="password" required />
-          </div>
+          {hasPassword && (
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Current Password</Label>
+              <Input id="currentPassword" name="currentPassword" type="password" required />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="newPassword">New Password</Label>
             <Input id="newPassword" name="newPassword" type="password" required minLength={8} />
@@ -198,11 +204,11 @@ function ChangePasswordDialog() {
             <Input id="confirmPassword" name="confirmPassword" type="password" required />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {success && <p className="text-sm text-emerald-600">Password changed successfully!</p>}
+          {success && <p className="text-sm text-emerald-600">Password {hasPassword ? 'changed' : 'set'} successfully!</p>}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Changing...' : 'Change Password'}
+              {isPending ? (hasPassword ? 'Changing...' : 'Setting...') : title}
             </Button>
           </DialogFooter>
         </form>
@@ -256,7 +262,7 @@ function RequestPositionDialog({ branches }: { branches: BranchOption[] }) {
         <Plus className="h-4 w-4" />
         Request New Position
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Request a New Position</DialogTitle>
           <DialogDescription>
@@ -268,7 +274,9 @@ function RequestPositionDialog({ branches }: { branches: BranchOption[] }) {
             <Label>Organization / Branch</Label>
             <Select name="branchId" value={selectedBranch} onValueChange={(val) => setSelectedBranch(val || '')} required>
               <SelectTrigger>
-                <SelectValue placeholder="Select a branch" />
+                <SelectValue placeholder="Select a branch">
+                  {selectedBranch && branches.find(b => b.id === selectedBranch)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {branches.map((b) => (
@@ -323,7 +331,6 @@ export function ProfileClient({
   myRequests,
   branches,
   activeMembershipId,
-  hasPasswordAuth,
 }: ProfileClientProps) {
   const activePositions = profile.memberships.filter((m) => m.is_active)
   const pastPositions = profile.memberships.filter((m) => !m.is_active)
@@ -358,60 +365,32 @@ export function ProfileClient({
         </div>
         <div className="flex gap-2">
           <EditProfileDialog profile={profile} />
-          {hasPasswordAuth && <ChangePasswordDialog />}
+          <ChangePasswordDialog hasPassword={profile.has_password ?? false} />
         </div>
       </div>
 
       {/* Info Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card className="border-border/50 bg-card/50">
-          <CardContent className="flex items-center gap-3 pt-6">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Email</p>
-              <p className="text-sm font-medium">{profile.email}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-card/50">
-          <CardContent className="flex items-center gap-3 pt-6">
-            <Phone className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Phone</p>
-              <p className="text-sm font-medium">{profile.phone ?? '—'}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-card/50">
-          <CardContent className="flex items-center gap-3 pt-6">
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">IEEE Membership ID</p>
-              <p className="text-sm font-medium">{profile.ieee_membership_id ?? '—'}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-card/50">
-          <CardContent className="flex items-center gap-3 pt-6">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Section</p>
-              <p className="text-sm font-medium">{profile.section ?? 'Gujarat Section'}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-card/50">
-          <CardContent className="flex items-center gap-3 pt-6">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Date Joined</p>
-              <p className="text-sm font-medium">{formatDate(profile.created_at)}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50 bg-card/50">
-          <CardContent className="flex items-center gap-3 pt-6">
-            <Shield className="h-4 w-4 text-muted-foreground" />
+        {[
+          { icon: Mail, label: 'Email', value: profile.email },
+          { icon: Phone, label: 'Phone', value: profile.phone ?? '—' },
+          { icon: CreditCard, label: 'IEEE Membership ID', value: profile.ieee_membership_id ?? '—' },
+          { icon: Building2, label: 'Section', value: profile.section ?? 'Gujarat Section' },
+          { icon: Calendar, label: 'Date Joined', value: formatDate(profile.created_at) },
+        ].map((item) => (
+          <Card key={item.label} className="border-border/50 bg-card/50 h-full">
+            <CardContent className="flex items-center gap-3 p-4 h-full">
+              <item.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">{item.label}</p>
+                <p className="text-sm font-medium truncate">{item.value}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        <Card className="border-border/50 bg-card/50 h-full">
+          <CardContent className="flex items-center gap-3 p-4 h-full">
+            <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Account Status</p>
               <Badge variant="outline" className={
@@ -455,32 +434,35 @@ export function ProfileClient({
                     : 'bg-card/50'
                 }`}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{m.position_name ?? 'Member'}</CardTitle>
-                    <div className="flex items-center gap-2">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-base font-semibold">{m.position_name ?? 'Member'}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">{m.branch_name}</p>
+                    </div>
+                    <div className="flex flex-col gap-1 items-end shrink-0">
                       {m.id === activeMembershipId && (
-                        <Badge className="bg-sidebar-primary/10 text-sidebar-primary border-sidebar-primary/20 text-[10px]">
+                        <Badge variant="secondary" className="bg-sidebar-primary/10 text-sidebar-primary border-sidebar-primary/20 text-[10px]">
                           Active Workspace
                         </Badge>
                       )}
-                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs">
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
                         Active
                       </Badge>
                     </div>
                   </div>
-                  <CardDescription>{m.branch_name}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-1.5 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5" />
+
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-3 border-t border-border/30">
                     <span>Assigned: {formatDate(m.assigned_at)}</span>
+                    {m.assigned_by_name && <span>By: {m.assigned_by_name}</span>}
                   </div>
-                  {m.assigned_by_name && (
-                    <div className="flex items-center gap-2">
-                      <User className="h-3.5 w-3.5" />
-                      <span>By: {m.assigned_by_name}</span>
-                    </div>
+
+                  {m.id !== activeMembershipId && (
+                    <form action={async () => { await switchWorkspace(m.id) }} className="mt-3">
+                      <Button variant="outline" size="sm" type="submit" className="w-full h-8 text-xs">
+                        Switch to Workspace
+                      </Button>
+                    </form>
                   )}
                 </CardContent>
               </Card>
@@ -493,19 +475,22 @@ export function ProfileClient({
       {pastPositions.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold mb-4">Position History</h3>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {pastPositions.map((m) => (
               <Card key={m.id} className="border-border/30 bg-card/30">
-                <CardContent className="flex items-center justify-between py-4">
-                  <div>
-                    <p className="text-sm font-medium">{m.position_name ?? 'Member'}</p>
-                    <p className="text-xs text-muted-foreground">{m.branch_name}</p>
-                  </div>
-                  <div className="text-right text-xs text-muted-foreground">
-                    <p>{formatDate(m.assigned_at)} — {formatDate(m.ended_at)}</p>
-                    <Badge variant="outline" className="bg-gray-500/10 text-gray-500 border-gray-500/20 text-[10px]">
-                      Ended
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-base font-semibold">{m.position_name ?? 'Member'}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">{m.branch_name}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                      Past Position
                     </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-3 border-t border-border/20">
+                    <span>Assigned: {formatDate(m.assigned_at)}</span>
+                    {m.ended_at && <span>Ended: {formatDate(m.ended_at)}</span>}
                   </div>
                 </CardContent>
               </Card>

@@ -37,3 +37,57 @@ export async function markAllAsRead() {
   revalidatePath('/', 'layout')
   return { success: true }
 }
+
+export async function sendBroadcast(formData: FormData) {
+  const session = await auth()
+  if (!session?.user?.id) return { error: 'Not authenticated' }
+
+  const supabase = createAdminClient()
+
+  // Verify admin status
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_super_admin')
+    .eq('id', session.user.id)
+    .single()
+
+  const isAdmin = profile?.is_super_admin || false
+  if (!isAdmin) return { error: 'Unauthorized. Only admins can send broadcasts.' }
+
+  const title = formData.get('title') as string
+  const message = formData.get('message') as string
+  const link = formData.get('link') as string || null
+
+  if (!title || !message) {
+    return { error: 'Title and message are required.' }
+  }
+
+  // Get all profile IDs
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id')
+
+  if (!profiles || profiles.length === 0) {
+    return { error: 'No users found.' }
+  }
+
+  // Bulk insert notifications
+  const notifications = profiles.map(p => ({
+    profile_id: p.id,
+    title,
+    message,
+    link,
+    is_read: false
+  }))
+
+  const { error } = await supabase
+    .from('notifications')
+    .insert(notifications)
+
+  if (error) {
+    console.error('Failed to send broadcast:', error)
+    return { error: 'Failed to send broadcast.' }
+  }
+
+  return { success: true }
+}

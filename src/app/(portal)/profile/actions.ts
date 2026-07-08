@@ -63,12 +63,12 @@ export async function changePassword(formData: FormData) {
     return { error: 'Not authenticated' }
   }
 
-  const currentPassword = formData.get('currentPassword') as string
+  const currentPassword = formData.get('currentPassword') as string | null
   const newPassword = formData.get('newPassword') as string
   const confirmPassword = formData.get('confirmPassword') as string
 
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    return { error: 'All password fields are required.' }
+  if (!newPassword || !confirmPassword) {
+    return { error: 'New password and confirm password are required.' }
   }
 
   if (newPassword.length < 8) {
@@ -88,14 +88,17 @@ export async function changePassword(formData: FormData) {
     .eq('id', session.user.id)
     .single()
 
-  if (!profile?.password_hash) {
-    return { error: 'Password change is not available for Google-only accounts.' }
-  }
+  const hasPassword = !!profile?.password_hash
 
-  // Verify current password
-  const isValid = await bcrypt.compare(currentPassword, profile.password_hash)
-  if (!isValid) {
-    return { error: 'Current password is incorrect.' }
+  if (hasPassword) {
+    if (!currentPassword) {
+      return { error: 'Current password is required to change password.' }
+    }
+    // Verify current password
+    const isValid = await bcrypt.compare(currentPassword, profile.password_hash)
+    if (!isValid) {
+      return { error: 'Current password is incorrect.' }
+    }
   }
 
   // Hash new password

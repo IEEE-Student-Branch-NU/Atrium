@@ -1,15 +1,33 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Notification } from '@/lib/queries'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Bell, Check, Clock, ExternalLink } from 'lucide-react'
-import { markAsRead, markAllAsRead } from './actions'
+import { Bell, Check, Clock, ExternalLink, Send } from 'lucide-react'
+import { markAsRead, markAllAsRead, sendBroadcast } from './actions'
 import { cn } from '@/lib/utils'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
-export function NotificationsClient({ notifications }: { notifications: Notification[] }) {
+export function NotificationsClient({ 
+  notifications, 
+  isAdmin 
+}: { 
+  notifications: Notification[]
+  isAdmin?: boolean
+}) {
   const [isPending, startTransition] = useTransition()
   const unreadCount = notifications.filter(n => !n.is_read).length
 
@@ -34,18 +52,21 @@ export function NotificationsClient({ notifications }: { notifications: Notifica
             Stay updated on your account activity and requests.
           </p>
         </div>
-        {unreadCount > 0 && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleMarkAll}
-            disabled={isPending}
-            className="gap-2"
-          >
-            <Check className="h-4 w-4" />
-            Mark all as read
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {isAdmin && <BroadcastDialog />}
+          {unreadCount > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleMarkAll}
+              disabled={isPending}
+              className="gap-2"
+            >
+              <Check className="h-4 w-4" />
+              Mark all as read
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -130,5 +151,77 @@ export function NotificationsClient({ notifications }: { notifications: Notifica
         )}
       </div>
     </div>
+  )
+}
+
+function BroadcastDialog() {
+  const [open, setOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  function handleSubmit(formData: FormData) {
+    setError(null)
+    setSuccess(false)
+    startTransition(async () => {
+      const result = await sendBroadcast(formData)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setSuccess(true)
+        setTimeout(() => setOpen(false), 2000)
+      }
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); setError(null); setSuccess(false) }}>
+      <DialogTrigger render={
+        <Button variant="default" size="sm" className="gap-2 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90">
+          <Send className="h-4 w-4" />
+          Send Broadcast
+        </Button>
+      } />
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Send Broadcast Notification</DialogTitle>
+          <DialogDescription>
+            Send a notification to all users in the system.
+          </DialogDescription>
+        </DialogHeader>
+        <form action={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="title">Title</Label>
+            <Input id="title" name="title" placeholder="e.g. System Maintenance" required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="message">Message</Label>
+            <Textarea 
+              id="message" 
+              name="message" 
+              placeholder="Enter your broadcast message..." 
+              required 
+              rows={4}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="link">Link (Optional)</Label>
+            <Input id="link" name="link" placeholder="e.g. /events or https://example.com" />
+          </div>
+          
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          {success && <p className="text-sm text-emerald-600">Broadcast sent successfully!</p>}
+          
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Sending...' : 'Send Broadcast'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

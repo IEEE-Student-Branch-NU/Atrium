@@ -30,19 +30,35 @@ export async function authMiddleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Edge-safe super-admin flag, set on the session by the `jwt`/`session`
-  // callbacks in `auth.config.ts` (Task 3). Never call `isSuperAdmin()` from
-  // `@/utils/auth/superadmin` here — it uses bcrypt, which is not Edge-safe.
+  // Edge-safe super-admin flag, set on the session by the jwt/session
+  // callbacks in auth.config.ts (Task 3). Never call isSuperAdmin() from
+  // @/utils/auth/superadmin here — it uses bcrypt, which is not Edge-safe.
   const isSA = session?.isSuperAdmin === true
 
-  // Block non-super-admins from the portal entirely.
-  if (pathname.startsWith('/superadmin') && !isSA) {
-    return NextResponse.redirect(new URL('/', request.url))
+  if (isSA) {
+    // Presence of the impersonation cookie means the super admin is viewing a
+    // member's workspace in the portal at `/`. The cookie name mirrors
+    // IMPERSONATE_COOKIE in @/utils/auth/impersonation (hardcoded here to avoid
+    // importing that server-only module into the Edge bundle); full crypto
+    // verification happens server-side in getEffectiveActor.
+    const impersonating = request.cookies.has('atrium_impersonate')
+
+    // Not impersonating → send them into their portal from any entry point.
+    if (
+      !impersonating &&
+      (pathname === '/' || pathname === '/login' || pathname === '/signup')
+    ) {
+      return NextResponse.redirect(new URL('/superadmin', request.url))
+    }
+
+    // Super admins bypass all registration/approval status gating (they have
+    // full access); while impersonating they stay in the member portal at `/`.
+    return NextResponse.next()
   }
 
-  // Route super admins straight into their portal from the app root.
-  if (isSA && pathname === '/') {
-    return NextResponse.redirect(new URL('/superadmin', request.url))
+  // Non-super-admins may not access the portal.
+  if (pathname.startsWith('/superadmin')) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // Logged in + on login/signup → redirect based on status

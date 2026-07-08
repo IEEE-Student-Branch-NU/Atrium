@@ -28,32 +28,32 @@ function getNotificationStyle(type: string, isRead: boolean) {
       return {
         icon: Megaphone,
         colorClass: isRead ? 'text-purple-500/60' : 'text-purple-500',
-        bgClass: isRead ? 'bg-purple-500/10' : 'bg-purple-500/20 border-purple-500/30'
+        bgClass: isRead ? 'bg-purple-500/5 border-purple-500/20 opacity-70' : 'bg-purple-500/10 border-purple-500/40'
       }
     case 'warning':
       return {
         icon: AlertTriangle,
         colorClass: isRead ? 'text-orange-500/60' : 'text-orange-500',
-        bgClass: isRead ? 'bg-orange-500/10' : 'bg-orange-500/20 border-orange-500/30'
+        bgClass: isRead ? 'bg-orange-500/5 border-orange-500/20 opacity-70' : 'bg-orange-500/10 border-orange-500/40'
       }
     case 'success':
       return {
         icon: CheckCircle,
         colorClass: isRead ? 'text-emerald-500/60' : 'text-emerald-500',
-        bgClass: isRead ? 'bg-emerald-500/10' : 'bg-emerald-500/20 border-emerald-500/30'
+        bgClass: isRead ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70' : 'bg-emerald-500/10 border-emerald-500/40'
       }
     case 'error':
       return {
         icon: XCircle,
         colorClass: isRead ? 'text-red-500/60' : 'text-red-500',
-        bgClass: isRead ? 'bg-red-500/10' : 'bg-red-500/20 border-red-500/30'
+        bgClass: isRead ? 'bg-red-500/5 border-red-500/20 opacity-70' : 'bg-red-500/10 border-red-500/40'
       }
     case 'normal':
     default:
       return {
         icon: Info,
         colorClass: isRead ? 'text-blue-500/60' : 'text-blue-500',
-        bgClass: isRead ? 'bg-blue-500/10' : 'bg-blue-500/20 border-blue-500/30'
+        bgClass: isRead ? 'bg-blue-500/5 border-blue-500/20 opacity-70' : 'bg-blue-500/10 border-blue-500/40'
       }
   }
 }
@@ -129,7 +129,7 @@ export function NotificationsClient({
               key={notification.id} 
               className={cn(
                 "transition-colors",
-                !notification.is_read ? style.bgClass : "bg-card/50 border-border/50 opacity-70"
+                style.bgClass
               )}
             >
               <CardContent className="flex flex-col sm:flex-row gap-4 p-4 sm:p-5">

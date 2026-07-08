@@ -138,3 +138,116 @@ export async function getBranchPositions(branchId: string): Promise<{ id: string
     .order('name')
   return data ?? []
 }
+
+// ── Users ────────────────────────────────────────────────────
+
+export type UserRow = {
+  id: string
+  full_name: string
+  email: string
+  ieee_membership_id: string | null
+  status: string
+}
+
+export type UserAdminProfile = {
+  id: string
+  full_name: string | null
+  email: string
+  ieee_membership_id: string | null
+  phone: string | null
+  section: string | null
+  status: string
+  bio: string | null
+  skills: string[] | null
+  created_at: string
+}
+
+export type UserMembershipRow = {
+  id: string
+  branch_id: string
+  position_id: string | null
+  assigned_at: string
+  ended_at: string | null
+  branches: { name: string } | null
+  positions: { name: string } | null
+}
+
+export type UserGrantRow = {
+  id: string
+  branch_id: string
+  granted_at: string
+  revoked_at: string | null
+  branches: { name: string } | null
+  permissions: { name: string } | null
+}
+
+export type PermissionRow = { id: string; name: string; description: string | null }
+
+/**
+ * `listUsers`'s search term is spliced directly into a raw PostgREST
+ * `.or(...)` filter string below. Commas separate conditions and
+ * parentheses group them in that mini-language, so an unescaped one typed
+ * into the search box could inject extra clauses or unbalance the filter.
+ * `%`/`_` are SQL ILIKE wildcards, stripped so a search can't be broadened
+ * beyond a literal substring match. Stripping (rather than escaping) is
+ * sufficient here since the search box only needs literal substring
+ * matching, not literal-wildcard search.
+ */
+function sanitizeSearchTerm(raw: string): string {
+  return raw.replace(/[,()%_]/g, '').trim()
+}
+
+export async function listUsers(opts: {
+  search?: string
+  status?: string
+  page?: number
+  pageSize?: number
+}): Promise<{ rows: UserRow[]; total: number }> {
+  const supabase = createAdminClient()
+  const page = opts.page ?? 1
+  const pageSize = opts.pageSize ?? 25
+  const from = (page - 1) * pageSize
+  let q = supabase.from('profiles').select('id, full_name, email, ieee_membership_id, status', { count: 'exact' })
+  if (opts.status) q = q.eq('status', opts.status)
+  if (opts.search) {
+    const term = sanitizeSearchTerm(opts.search)
+    if (term) {
+      const s = `%${term}%`
+      q = q.or(`full_name.ilike.${s},email.ilike.${s},ieee_membership_id.ilike.${s}`)
+    }
+  }
+  const { data, count } = await q.order('full_name').range(from, from + pageSize - 1)
+  return { rows: (data ?? []) as UserRow[], total: count ?? 0 }
+}
+
+export async function getUserAdminDetail(profileId: string): Promise<{
+  profile: UserAdminProfile
+  memberships: UserMembershipRow[]
+  grants: UserGrantRow[]
+} | null> {
+  const supabase = createAdminClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, ieee_membership_id, phone, section, status, bio, skills, created_at')
+    .eq('id', profileId).single()
+  if (!profile) return null
+  const { data: memberships } = await supabase
+    .from('memberships')
+    .select('id, branch_id, position_id, assigned_at, ended_at, branches(name), positions(name)')
+    .eq('profile_id', profileId).order('assigned_at', { ascending: false })
+  const { data: grants } = await supabase
+    .from('member_permissions')
+    .select('id, branch_id, granted_at, revoked_at, branches(name), permissions(name)')
+    .eq('profile_id', profileId).is('revoked_at', null)
+  return {
+    profile: profile as unknown as UserAdminProfile,
+    memberships: (memberships ?? []) as unknown as UserMembershipRow[],
+    grants: (grants ?? []) as unknown as UserGrantRow[],
+  }
+}
+
+export async function getAllPermissions(): Promise<PermissionRow[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase.from('permissions').select('id, name, description').order('name')
+  return data ?? []
+}

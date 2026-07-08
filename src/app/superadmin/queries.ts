@@ -73,3 +73,68 @@ export async function getRecentActivityFeed(limit = 10): Promise<ActivityItem[]>
     source: 'audit' as const,
   }))
 }
+
+// ── Branch Detail ────────────────────────────────────────────
+
+export type MemberRow = {
+  membership_id: string
+  profile_id: string
+  full_name: string
+  email: string
+  position_name: string | null
+}
+
+export type BranchDetail = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  parent_id: string | null
+  parentName: string | null
+}
+
+export async function getBranchDetail(branchId: string): Promise<BranchDetail | null> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('branches')
+    .select('id, name, slug, description, parent_id, parent:branches!parent_id(name)')
+    .eq('id', branchId)
+    .single()
+  if (!data) return null
+
+  const { parent, ...branch } = data as unknown as {
+    id: string
+    name: string
+    slug: string
+    description: string | null
+    parent_id: string | null
+    parent: { name: string } | null
+  }
+  return { ...branch, parentName: parent?.name ?? null }
+}
+
+export async function getBranchMembers(branchId: string): Promise<MemberRow[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('memberships')
+    .select('id, profile_id, profiles!memberships_profile_id_fkey(full_name, email), positions(name)')
+    .eq('branch_id', branchId)
+    .is('ended_at', null)
+  return (data ?? []).map((m) => ({
+    membership_id: m.id,
+    profile_id: m.profile_id,
+    full_name: (m.profiles as unknown as { full_name: string | null } | null)?.full_name ?? '',
+    email: (m.profiles as unknown as { email: string | null } | null)?.email ?? '',
+    position_name: (m.positions as unknown as { name: string } | null)?.name ?? null,
+  }))
+}
+
+export async function getBranchPositions(branchId: string): Promise<{ id: string; name: string }[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('positions')
+    .select('id, name')
+    .eq('branch_id', branchId)
+    .order('name')
+  return data ?? []
+}

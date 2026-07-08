@@ -49,3 +49,88 @@ export async function exitWorkspace() {
   revalidatePath('/', 'layout')
   redirect('/superadmin')
 }
+
+// ── Organizations / Branches ─────────────────────────────────
+
+export async function createOrganization(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const name = String(formData.get('name') ?? '').trim()
+  const slug = String(formData.get('slug') ?? '').trim()
+  const description = String(formData.get('description') ?? '').trim() || null
+  if (!name || !slug) return { error: 'Name and slug are required' }
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('branches')
+    .insert({ name, slug, description, parent_id: null })
+    .select('id')
+    .single()
+  if (error) return { error: error.message }
+  await logAdminAction({
+    actorProfileId: session.user!.id,
+    action: 'org_created',
+    entityType: 'organization',
+    entityId: data.id,
+    branchId: data.id,
+    summary: `Created organization "${name}"`,
+    details: { slug },
+  })
+  revalidatePath('/superadmin/organizations')
+  return { success: true }
+}
+
+export async function createSubBranch(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const parent_id = String(formData.get('parent_id') ?? '')
+  const name = String(formData.get('name') ?? '').trim()
+  const slug = String(formData.get('slug') ?? '').trim()
+  const description = String(formData.get('description') ?? '').trim() || null
+  if (!parent_id || !name || !slug) return { error: 'Parent, name, and slug are required' }
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('branches')
+    .insert({ name, slug, description, parent_id })
+    .select('id')
+    .single()
+  if (error) return { error: error.message }
+  await logAdminAction({
+    actorProfileId: session.user!.id,
+    action: 'branch_created',
+    entityType: 'branch',
+    entityId: data.id,
+    branchId: data.id,
+    summary: `Created branch "${name}"`,
+    details: { parent_id, slug },
+  })
+  revalidatePath('/superadmin/organizations')
+  return { success: true }
+}
+
+export async function updateBranch(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const id = String(formData.get('id') ?? '')
+  const name = String(formData.get('name') ?? '').trim()
+  const slug = String(formData.get('slug') ?? '').trim()
+  const description = String(formData.get('description') ?? '').trim() || null
+  if (!id || !name || !slug) return { error: 'Name and slug are required' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('branches').update({ name, slug, description }).eq('id', id)
+  if (error) return { error: error.message }
+  await logAdminAction({
+    actorProfileId: session.user!.id,
+    action: 'branch_updated',
+    entityType: 'branch',
+    entityId: id,
+    branchId: id,
+    summary: `Updated "${name}"`,
+    details: { slug },
+  })
+  revalidatePath(`/superadmin/organizations/${id}`)
+  revalidatePath('/superadmin/organizations')
+  return { success: true }
+}

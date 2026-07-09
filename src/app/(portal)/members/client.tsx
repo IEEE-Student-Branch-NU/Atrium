@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import Link from 'next/link'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, Users, Copy, Check, Mail, Phone, Hash, Building2, ChevronDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,7 +14,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { DirectoryMember } from '@/lib/queries'
+import { createClient } from '@/utils/supabase/client'
 
 function getInitials(name: string | null): string {
   if (!name) return '?'
@@ -50,25 +52,41 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   )
 }
 
-export function MembersDirectoryClient({ members }: { members: DirectoryMember[] }) {
+export function MembersDirectoryClient({ 
+  members, 
+  branches 
+}: { 
+  members: DirectoryMember[]
+  branches: string[]
+}) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
-  const [branchFilter, setBranchFilter] = useState<string | null>(null)
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([])
 
-  // Collect unique branches for filter dropdown
-  const branches = useMemo(() => {
-    const set = new Set<string>()
-    for (const m of members) {
-      if (m.branch_name) set.add(m.branch_name)
+  // Setup Realtime subscription
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('members-directory')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        router.refresh()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'memberships' }, () => {
+        router.refresh()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
-    return Array.from(set).sort()
-  }, [members])
+  }, [router])
 
   // Filter members
   const filtered = useMemo(() => {
     let result = members
 
-    if (branchFilter) {
-      result = result.filter(m => m.branch_name === branchFilter)
+    if (selectedBranches.length > 0) {
+      result = result.filter(m => m.branch_name && selectedBranches.includes(m.branch_name))
     }
 
     if (search.trim()) {
@@ -83,7 +101,7 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
     }
 
     return result
-  }, [members, search, branchFilter])
+  }, [members, search, selectedBranches])
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -108,19 +126,47 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
         </div>
 
         <DropdownMenu>
-          <DropdownMenuTrigger>
-            <Button variant="outline" className="gap-2 shrink-0">
+          <DropdownMenuTrigger render={
+            <Button variant="outline" className="gap-2 shrink-0" />
+          }>
               <Building2 className="h-4 w-4" />
-              {branchFilter ?? 'All Branches'}
+              {selectedBranches.length === 0 
+                ? 'All Branches' 
+                : `${selectedBranches.length} Selected`}
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setBranchFilter(null)}>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem 
+              closeOnClick={false}
+              onClick={() => setSelectedBranches([])}
+              className="gap-2 cursor-pointer"
+            >
+              <Checkbox checked={selectedBranches.length === 0} onCheckedChange={() => setSelectedBranches([])} />
               All Branches
             </DropdownMenuItem>
             {branches.map(b => (
-              <DropdownMenuItem key={b} onClick={() => setBranchFilter(b)}>
+              <DropdownMenuItem 
+                key={b} 
+                closeOnClick={false}
+                onClick={() => {
+                  if (selectedBranches.includes(b)) {
+                    setSelectedBranches(prev => prev.filter(x => x !== b))
+                  } else {
+                    setSelectedBranches(prev => [...prev, b])
+                  }
+                }}
+                className="gap-2 cursor-pointer"
+              >
+                <Checkbox 
+                  checked={selectedBranches.includes(b)} 
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedBranches(prev => [...prev, b])
+                    } else {
+                      setSelectedBranches(prev => prev.filter(x => x !== b))
+                    }
+                  }} 
+                />
                 {b}
               </DropdownMenuItem>
             ))}
@@ -133,7 +179,7 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
         <Users className="h-4 w-4" />
         <span>
           {filtered.length} member{filtered.length !== 1 ? 's' : ''}
-          {search || branchFilter ? ' found' : ' total'}
+          {search || selectedBranches.length > 0 ? ' found' : ' total'}
         </span>
       </div>
 
@@ -153,8 +199,11 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((member) => (
-            <Link key={member.id} href={`/members/${member.id}`} className="block">
-              <Card className="group hover:border-primary/30 transition-colors cursor-pointer h-full">
+              <Card 
+                key={member.id}
+                className="group hover:border-primary/30 transition-colors cursor-pointer h-full"
+                onClick={() => router.push(`/members/${member.id}`)}
+              >
                 <CardContent className="p-4 space-y-3">
                   {/* Top: Avatar + Name + Position */}
                   <div className="flex items-start gap-3">
@@ -214,7 +263,6 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
                   </div>
                 </CardContent>
               </Card>
-            </Link>
           ))}
         </div>
       )}

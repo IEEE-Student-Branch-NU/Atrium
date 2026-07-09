@@ -587,7 +587,7 @@ export async function getMembersDirectory(): Promise<DirectoryMember[]> {
 
   return profiles.map(p => ({
     ...p,
-    branch_name: membershipMap.get(p.id)?.branch_name ?? 'IEEE SBNU',
+    branch_name: membershipMap.get(p.id)?.branch_name ?? null,
     position_name: membershipMap.get(p.id)?.position_name ?? null,
   }))
 }

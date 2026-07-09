@@ -321,3 +321,66 @@ export async function getRecentDecidedPositionRequests(limit = 25): Promise<Deci
     created_at: r.created_at,
   }))
 }
+
+// ── Audit Log ────────────────────────────────────────────────
+// Phase-1 scope for the Audit page is the `audit_log` source only
+// (super-admin/structural actions written by `logAdminAction`), filtered
+// by actor and paginated. Merging the legacy `event_audit_log` /
+// `membership_audit_log` feeds into this same view is a noted follow-up —
+// the `source` param is left wired for that extension.
+//
+// The `audit_log` migration (00008) may not be applied yet in every
+// environment, so this must degrade to an empty page rather than throw.
+
+export type AuditEntry = {
+  id: string; actor: string; action: string; entityType: string
+  summary: string; branchName: string | null; created_at: string
+  source: 'audit' | 'event' | 'membership'
+}
+
+export async function getAuditLog(opts: {
+  source?: 'audit' | 'event' | 'membership'; actorId?: string; page?: number; pageSize?: number
+}): Promise<{ rows: AuditEntry[]; total: number }> {
+  const supabase = createAdminClient()
+  const page = opts.page ?? 1
+  const pageSize = opts.pageSize ?? 50
+  const from = (page - 1) * pageSize
+
+  try {
+    let q = supabase
+      .from('audit_log')
+      .select(
+        'id, action, entity_type, summary, created_at, branch_id, branches(name), profiles!audit_log_actor_profile_id_fkey(full_name)',
+        { count: 'exact' }
+      )
+      .order('created_at', { ascending: false })
+    if (opts.actorId) q = q.eq('actor_profile_id', opts.actorId)
+    const { data, count, error } = await q.range(from, from + pageSize - 1)
+    if (error) {
+      console.error('getAuditLog failed', error)
+      return { rows: [], total: 0 }
+    }
+
+    const rows: AuditEntry[] = (data ?? []).map((r) => {
+      const row = r as unknown as {
+        id: string; action: string; entity_type: string; summary: string; created_at: string
+        branches: { name: string } | null
+        profiles: { full_name: string | null } | null
+      }
+      return {
+        id: row.id,
+        actor: row.profiles?.full_name ?? 'Unknown',
+        action: row.action,
+        entityType: row.entity_type,
+        summary: row.summary,
+        branchName: row.branches?.name ?? null,
+        created_at: row.created_at,
+        source: 'audit',
+      }
+    })
+    return { rows, total: count ?? 0 }
+  } catch (e) {
+    console.error('getAuditLog failed', e)
+    return { rows: [], total: 0 }
+  }
+}

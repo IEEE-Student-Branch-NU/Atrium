@@ -2,6 +2,7 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcrypt'
 import { createAdminClient } from '@/utils/supabase/server'
+import { isSuperAdmin } from '@/utils/auth/superadmin'
 import authConfig from './auth.config'
 
 /**
@@ -51,4 +52,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  callbacks: {
+    ...authConfig.callbacks,
+    // Override `jwt`: delegate to the edge-safe base callback (which sets
+    // token.profileId/status/isMembershipComplete), then stamp
+    // `isSuperAdmin` once at sign-in. bcrypt is only available here in the
+    // Node runtime — never call `isSuperAdmin` from anything auth.config.ts
+    // pulls into the Edge middleware bundle.
+    async jwt(params) {
+      const token = await authConfig.callbacks!.jwt!(params)
+      if (!token) return token
+
+      const { user } = params
+      if (user) {
+        token.isSuperAdmin = await isSuperAdmin(user.email ?? token.email ?? null)
+      }
+
+      return token
+    },
+  },
 })

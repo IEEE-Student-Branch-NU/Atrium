@@ -1,6 +1,6 @@
 # IEEE SBNU Event Creation Portal — Database Schema (v2)
 
-> **Last Updated:** July 2026 | **Migrations:** `00001_initial_schema.sql`, `00002_permission_system.sql`
+> **Last Updated:** July 2026 | **Migrations:** `00001_initial_schema.sql` through `00008_audit_log.sql` (see [§10 Migration History](#10-migration-history) for the full list)
 
 This document is the single source of truth for the database architecture. It covers every table, enum, trigger, index, and seed record — along with the reasoning behind each decision. Written for future team members to read, review, and tweak.
 
@@ -39,7 +39,7 @@ Previously, a simple `portal_role` enum (`member`, `admin`, `super_admin`) contr
   - `permissions` → atomic system actions (`create_events`, `approve_registrations`, etc.)
   - `position_permissions` → maps positions to their allowed permissions
   - `member_permissions` → ad-hoc grants for individual users (override/supplement)
-  - `is_super_admin` → boolean flag on `profiles` for global system bypass
+  - `superadmins` → global system bypass, identified out-of-band (see §1.7) rather than a flag on `profiles`
 
 ### 1.3 Membership History (Append-Only)
 - **Decision:** Single `memberships` table, never overwrite.
@@ -57,6 +57,13 @@ Previously, a simple `portal_role` enum (`member`, `admin`, `super_admin`) contr
 ### 1.6 Image Storage (JSONB)
 - **Decision:** Store ImageKit metadata as a JSONB column on `events.banner`.
 - **Why:** Extensible without schema changes. Currently stores `{ url, file_id, width, height, format }`. Can easily add thumbnails or crops later.
+
+### 1.7 Invisible SuperAdmin Identity (No `profiles` Flag)
+- **Decision:** SuperAdmin status is **not** a column on `profiles`. It is determined by matching the signed-in user's email (bcrypt-compared) against the `superadmins` table, and is stamped onto the NextAuth JWT as `session.isSuperAdmin` at sign-in.
+- **Why:** An earlier version (migration `00002`) used a plain `is_super_admin BOOLEAN` on `profiles`. Migration `00004_invisible_superadmin.sql` dropped that column so SuperAdmin status can't be discovered by querying/joining `profiles`, and moved the source of truth to a dedicated table with hashed emails and RLS enabled (service-role only, no public policies).
+- **How it's checked:** `isSuperAdmin(email)` in `src/utils/auth/superadmin.ts` loads all `superadmins.hashed_email` rows and bcrypt-compares the candidate email against each. The result is cached into the session at login; downstream code (e.g. the permission engine in `src/utils/auth/permissions.ts`) reads `session.isSuperAdmin` and short-circuits to the `['*']` wildcard rather than re-querying `superadmins` on every check.
+- **Superseded:** An earlier "sudo mode" design (a passphrase-gated `/sudo` route setting an elevation cookie, with a matching `passphrase_hash` column on `superadmins`) has been removed from the app. The `superadmins.passphrase_hash` column still exists from migration `00004` but is no longer read by the app.
+- **Audit trail:** Actions taken through the SuperAdmin portal (`/superadmin/**`) are recorded in the `audit_log` table (migration `00008`, documented in §4.14) via `logAdminAction()` in `src/utils/auth/audit.ts` — a best-effort write that never throws into the caller.
 
 ---
 
@@ -85,7 +92,6 @@ erDiagram
         TEXT phone
         TEXT section
         DATE membership_expiry
-        BOOLEAN is_super_admin
         registration_status status
         UUID approved_by FK
         TIMESTAMPTZ approved_at
@@ -210,12 +216,25 @@ erDiagram
         TIMESTAMPTZ created_at
     }
 
+    audit_log {
+        UUID id PK
+        UUID actor_profile_id FK "→ profiles"
+        TEXT action
+        TEXT entity_type
+        UUID entity_id "no FK — polymorphic target"
+        UUID branch_id FK "→ branches, nullable"
+        TEXT summary
+        JSONB details
+        TIMESTAMPTZ created_at
+    }
+
     profiles ||--o{ memberships : "profile_id"
     profiles ||--o{ member_permissions : "profile_id"
     profiles ||--o{ events : "creator_id"
     profiles ||--o{ event_approvals : "approver_id"
     profiles ||--o{ event_audit_log : "changed_by"
     profiles ||--o{ membership_audit_log : "changed_by"
+    profiles ||--o{ audit_log : "actor_profile_id"
 
     branches ||--o| branches : "parent_id"
     branches ||--o{ positions : "branch_id"
@@ -223,6 +242,7 @@ erDiagram
     branches ||--o{ events : "branch_id"
     branches ||--o{ member_permissions : "branch_id"
     branches ||--o{ membership_audit_log : "branch_id"
+    branches ||--o{ audit_log : "branch_id"
 
     positions ||--o{ memberships : "position_id"
     positions ||--o{ position_permissions : "position_id"
@@ -253,7 +273,6 @@ Auto-created via trigger when a user signs up. Stores public identity + registra
 | `phone` | TEXT | | Contact number |
 | `section` | TEXT | DEFAULT `'Gujarat Section'` | IEEE organizational section |
 | `membership_expiry` | DATE | | When IEEE membership expires |
-| `is_super_admin` | BOOLEAN | NOT NULL, DEFAULT `false` | Global bypass — all permissions in all branches |
 | `status` | `registration_status` | NOT NULL, DEFAULT `'pending'` | Registration approval state |
 | `approved_by` | UUID | FK → `profiles` | Who approved this registration |
 | `approved_at` | TIMESTAMPTZ | | When they were approved |
@@ -443,6 +462,27 @@ Immutable log of all membership/role/position changes.
 
 ---
 
+### 4.14 `audit_log`
+*(Added in migration `00008_audit_log.sql`.)* Unified, append-only log of super-admin / structural actions taken through the SuperAdmin portal (`/superadmin/**`) — e.g. creating a branch, assigning/removing a position, granting/revoking a permission, positions CRUD, deciding a position request, entering/exiting workspace impersonation. It **complements — and for some actions overlaps with —** the two older audit tables rather than replacing them: `event_audit_log` (event lifecycle) and `membership_audit_log` (all membership/role/position changes, plus some self-service events such as a user's own password change in `src/app/(portal)/profile/actions.ts` and workspace switches in `src/app/(portal)/actions.ts`). In particular, super-admin position assign/remove (`assignPosition`/`removePosition` in `src/app/superadmin/actions.ts`) are recorded in **both** `membership_audit_log` (tagged `details.via: 'super_admin'`) **and** `audit_log`, so for those actions the two tables are not disjoint. Written by `logAdminAction()` in `src/utils/auth/audit.ts`, which is a **best-effort** write (failures are logged and swallowed — a failed audit insert never blocks or throws into the calling action).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK, DEFAULT `gen_random_uuid()` | |
+| `actor_profile_id` | UUID | NOT NULL, FK → `profiles` | Who performed the action (the real SuperAdmin, not an impersonated identity) |
+| `action` | TEXT | NOT NULL | Free-form action slug, e.g. `branch_created`, `position_assigned`, `permission_granted` |
+| `entity_type` | TEXT | NOT NULL | One of `organization`, `branch`, `position`, `user`, `membership`, `permission`, `workspace` (per the `AdminAction` type in `audit.ts`) |
+| `entity_id` | UUID | | Nullable, **no FK** — polymorphic target, points at a row in whichever table `entity_type` names |
+| `branch_id` | UUID | FK → `branches` | Nullable — scopes the action to a branch when applicable |
+| `summary` | TEXT | NOT NULL | Human-readable one-line description shown on the Audit page |
+| `details` | JSONB | | Optional structured payload (e.g. before/after values) |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT `now()` | |
+
+**RLS:** Enabled with **no public policies** — only the service-role client (`createAdminClient()`) can read or write this table, consistent with `superadmins`.
+
+**Known follow-up:** The SuperAdmin Audit page currently reads only from `audit_log` (Phase-1 scope). Merging the legacy `event_audit_log` and `membership_audit_log` feeds into the same view is a flagged, not-yet-implemented extension (the `source` parameter in `getAuditLog()` is already wired for it).
+
+---
+
 ## 5. Triggers & Functions
 
 | Trigger | Table | Function | Purpose |
@@ -473,6 +513,9 @@ VALUES (NEW.id, NEW.email, COALESCE(name, full_name), avatar_url, 'pending');
 | `idx_event_audit_action` | `event_audit_log` | `(action)` | B-Tree | Filter by action type |
 | `idx_membership_audit_profile` | `membership_audit_log` | `(profile_id)` | B-Tree | Audit trail for a user |
 | `idx_membership_audit_branch` | `membership_audit_log` | `(branch_id)` | B-Tree | Audit trail for a branch |
+| `idx_audit_log_created` | `audit_log` | `(created_at DESC)` | B-Tree | Audit page: newest actions first |
+| `idx_audit_log_actor` | `audit_log` | `(actor_profile_id)` | B-Tree | Filter by actor (e.g. "actions by me") |
+| `idx_audit_log_entity` | `audit_log` | `(entity_type, entity_id)` | B-Tree | Look up all audit entries for a given entity |
 
 ---
 
@@ -525,15 +568,43 @@ Shows which permissions each position gets **out of the box** (seeded in migrati
 | `manage_event_types` | ✅ | | | | | |
 | `manage_positions` | ✅ | | | | | |
 
-> **SuperAdmin** (`is_super_admin = true` on `profiles`) bypasses this matrix entirely — all permissions in all branches.
+> **SuperAdmin** bypasses this matrix entirely — all permissions in all branches. There is **no** `is_super_admin` column on `profiles` (dropped in migration `00004`); the permission engine (`getUserPermissions()` / `canApproveRegistrations()` in `src/utils/auth/permissions.ts`) checks `session.isSuperAdmin` and returns the wildcard `['*']` instead of resolving positions/grants. See §1.7 for how that session flag is derived.
 
 ---
 
 ## 9. Key Query Patterns
 
 ### Check if user is SuperAdmin
-```sql
-SELECT is_super_admin FROM profiles WHERE id = $1;
+SuperAdmin status is **not** a queryable column — it's resolved at sign-in by bcrypt-comparing the user's email against every `superadmins.hashed_email` row, then cached onto the session as `isSuperAdmin`. There is no single indexed lookup because bcrypt hashes can't be matched with `WHERE hashed_email = ...`.
+
+```ts
+// src/utils/auth/superadmin.ts
+// Pure, unit-testable matcher — bcrypt-compares the email against each row.
+export async function matchesSuperAdmin(
+  email: string,
+  rows: { hashed_email: string }[]
+): Promise<boolean> {
+  for (const row of rows) {
+    if (await bcrypt.compare(email, row.hashed_email)) return true
+  }
+  return false
+}
+
+// IO wrapper — fetches the superadmins rows (service role) then delegates. Memoized per request.
+export const isSuperAdmin = cache(async (email: string | null | undefined): Promise<boolean> => {
+  if (!email) return false
+  const supabase = createAdminClient()
+  const { data } = await supabase.from('superadmins').select('hashed_email')
+  if (!data || data.length === 0) return false
+  return matchesSuperAdmin(email, data)
+})
+```
+
+Downstream, once `session.isSuperAdmin` is set, every permission check is a cheap in-memory read:
+```ts
+// src/utils/auth/permissions.ts
+const session = await auth()
+if (session?.isSuperAdmin) return ['*']
 ```
 
 ### Get all permissions for a user in a branch
@@ -600,3 +671,9 @@ WHERE ieee_membership_id = $1;
 |-----------|-------------|-------------|
 | `00001_initial_schema.sql` | Foundation schema | Created all core tables: profiles, branches, positions, memberships, events, event_types, event_approvals, event_audit_log, membership_audit_log. Seeded branches, positions, and event types. |
 | `00002_permission_system.sql` | Permission-based access + registration gating | Dropped `portal_role` enum and `can_create_events` column. Added `permissions`, `position_permissions`, `member_permissions`, `pre_approved_members` tables. Added registration fields to `profiles` (`ieee_membership_id`, `status`, `is_super_admin`, etc.). Seeded MDO position and full permission matrix. |
+| `00003_nextauth_migration.sql` | Decouple auth from Supabase `auth.users` | Added `profiles.password_hash` for email/password users. Dropped the `on_auth_user_created` trigger and the `profiles_id_fkey` FK to `auth.users` (auth is now owned by NextAuth/Auth.js, Supabase is database-only). Set `profiles.id` to self-generate via `gen_random_uuid()`. |
+| `00004_invisible_superadmin.sql` | Move SuperAdmin off `profiles` | Created `superadmins` table (bcrypt-hashed emails + passphrase hash), RLS enabled with no public policies. **Dropped `profiles.is_super_admin`.** Seeded the initial SuperAdmins. (The `passphrase_hash` column was for a since-removed `/sudo` elevation flow and is no longer read by the app — see §1.7.) |
+| `00005_new_positions.sql` | Seed additional standard positions | Added `Web Master`, `Treasurer`, `Technical Associate`, `Marketing Associate` positions to every branch, with baseline `view_members` (and `create_events` for Web Master/Treasurer) permissions. |
+| `00006_workspace_and_requests.sql` | Position requests + notifications | Added `profiles.bio`/`profiles.skills`. Added `position_request_status` enum and `position_requests` table (member-initiated requests to hold a position). Added `notifications` table. |
+| `00007_notification_types.sql` | Notification categorization | Added `notifications.type` column (`normal`, `broadcast`, `success`, `warning`, `error`). |
+| `00008_audit_log.sql` | Unified SuperAdmin audit trail | Added `audit_log` table (documented in §4.14) with indexes on `created_at`, `actor_profile_id`, and `(entity_type, entity_id)`. RLS enabled with no public policies (service-role only). Records structural/super-admin actions taken via the SuperAdmin portal. |

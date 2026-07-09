@@ -42,17 +42,11 @@ export async function sendBroadcast(formData: FormData) {
   const session = await auth()
   if (!session?.user?.id) return { error: 'Not authenticated' }
 
-  const supabase = createAdminClient()
-
   // Verify admin status
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_super_admin')
-    .eq('id', session.user.id)
-    .single()
+  const canBroadcast = session?.isSuperAdmin === true
+  if (!canBroadcast) return { error: 'Unauthorized. Only admins can send broadcasts.' }
 
-  const isAdmin = profile?.is_super_admin || false
-  if (!isAdmin) return { error: 'Unauthorized. Only admins can send broadcasts.' }
+  const supabase = createAdminClient()
 
   const title = formData.get('title') as string
   const message = formData.get('message') as string

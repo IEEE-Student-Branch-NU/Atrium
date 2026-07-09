@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
+import { getEffectiveActor } from '@/utils/auth/superadmin'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { getDashboardStats, getUserProfileWithMembership, getRecentActivity } from '@/lib/queries'
@@ -76,7 +77,8 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  const profile = await getUserProfileWithMembership(session.user.id)
+  const actor = await getEffectiveActor()
+  const profile = await getUserProfileWithMembership(actor.actingProfileId!)
   if (!profile) redirect('/login')
 
   const supabase = createAdminClient()

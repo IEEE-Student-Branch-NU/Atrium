@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import { isSudoMode } from '@/utils/auth/sudo'
+import { auth } from '@/auth'
 
 export type PermissionName =
   | 'create_events'
@@ -30,8 +30,9 @@ export async function getUserPermissions(
   branchId: string,
   membershipId?: string | null
 ): Promise<string[]> {
-  // 1. Check SuperAdmin bypass from signed secure cookie
-  if (await isSudoMode()) {
+  // 1. Check SuperAdmin bypass from session
+  const session = await auth()
+  if (session?.isSuperAdmin) {
     return [WILDCARD]
   }
 
@@ -150,8 +151,9 @@ export async function canApproveRegistrations(
   supabase: SupabaseClient,
   profileId: string
 ): Promise<boolean> {
-  // SuperAdmin check from signed secure cookie
-  if (await isSudoMode()) return true
+  // SuperAdmin check from session
+  const session = await auth()
+  if (session?.isSuperAdmin) return true
 
   // Check if user holds any position with approve_registrations in any branch
   const { data: memberships } = await supabase

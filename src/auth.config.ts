@@ -86,8 +86,18 @@ export default {
     async session({ session, token }) {
       if (token) {
         session.user.id = token.profileId as string
+        // NOTE: `token.status`/`token.isMembershipComplete` still need a cast.
+        // next-auth/jwt.d.ts re-exports `JWT` via `export * from "@auth/core/jwt"`
+        // (a wildcard re-export); TS module augmentation of `next-auth/jwt` does not
+        // propagate through that wildcard back to the original `@auth/core/jwt`
+        // interface that these callback params are actually typed against, so reads
+        // of augmented JWT fields resolve to `unknown` here. (By contrast, `next-auth`
+        // re-exports `Session` via a named `export type { Session } from ...`, which
+        // *does* propagate — confirmed `session.isSuperAdmin` below and all
+        // consumer-facing `session.*` reads via `auth()` are correctly typed.)
         ;(session as any).status = token.status
         ;(session as any).isMembershipComplete = token.isMembershipComplete
+        session.isSuperAdmin = token.isSuperAdmin === true
       }
       return session
     },

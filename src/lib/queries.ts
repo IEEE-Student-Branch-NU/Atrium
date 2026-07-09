@@ -91,7 +91,6 @@ export interface UserProfileWithMembership {
   phone: string | null
   ieee_membership_id: string | null
   status: string
-  is_super_admin: boolean
   bio: string | null
   skills: string[] | null
   section: string | null
@@ -117,7 +116,7 @@ export async function getUserProfileWithMembership(
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, status, is_super_admin, bio, skills, section, created_at')
+    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, status, bio, skills, section, created_at')
     .eq('id', profileId)
     .single()
 
@@ -209,7 +208,6 @@ export interface FullUserProfile {
   bio: string | null
   skills: string[] | null
   status: string
-  is_super_admin: boolean
   has_password?: boolean
   created_at: string
   memberships: {
@@ -229,7 +227,7 @@ export async function getFullUserProfile(profileId: string): Promise<FullUserPro
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, section, bio, skills, status, is_super_admin, created_at, password_hash')
+    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, section, bio, skills, status, created_at, password_hash')
     .eq('id', profileId)
     .single()
 

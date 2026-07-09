@@ -52,7 +52,13 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   )
 }
 
-export function MembersDirectoryClient({ members }: { members: DirectoryMember[] }) {
+export function MembersDirectoryClient({ 
+  members, 
+  branches 
+}: { 
+  members: DirectoryMember[]
+  branches: string[]
+}) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
@@ -74,15 +80,6 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
       supabase.removeChannel(channel)
     }
   }, [router])
-
-  // Collect unique branches for filter dropdown
-  const branches = useMemo(() => {
-    const set = new Set<string>()
-    for (const m of members) {
-      if (m.branch_name) set.add(m.branch_name)
-    }
-    return Array.from(set).sort()
-  }, [members])
 
   // Filter members
   const filtered = useMemo(() => {

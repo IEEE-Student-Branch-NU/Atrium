@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
-import { getMembersDirectory } from '@/lib/queries'
+import { getMembersDirectory, getAllBranches } from '@/lib/queries'
 import { MembersDirectoryClient } from './client'
 
 export const metadata = {
@@ -11,10 +11,14 @@ export default async function MembersPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
-  const allMembers = await getMembersDirectory()
+  const [allMembers, branchesData] = await Promise.all([
+    getMembersDirectory(),
+    getAllBranches()
+  ])
 
   // Exclude the logged-in user — no need to search for yourself
   const members = allMembers.filter(m => m.id !== session.user!.id)
+  const branches = branchesData.map(b => b.name)
 
-  return <MembersDirectoryClient members={members} />
+  return <MembersDirectoryClient members={members} branches={branches} />
 }

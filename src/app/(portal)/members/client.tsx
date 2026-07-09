@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Users, Copy, Check, Mail, Phone, Hash, Building2, ChevronDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,10 +11,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { DirectoryMember } from '@/lib/queries'
+import { createClient } from '@/utils/supabase/client'
 
 function getInitials(name: string | null): string {
   if (!name) return '?'
@@ -53,7 +54,25 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 export function MembersDirectoryClient({ members }: { members: DirectoryMember[] }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
-  const [branchFilter, setBranchFilter] = useState<string | null>(null)
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([])
+
+  // Setup Realtime subscription
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('members-directory')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        router.refresh()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'memberships' }, () => {
+        router.refresh()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [router])
 
   // Collect unique branches for filter dropdown
   const branches = useMemo(() => {
@@ -68,8 +87,8 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
   const filtered = useMemo(() => {
     let result = members
 
-    if (branchFilter) {
-      result = result.filter(m => m.branch_name === branchFilter)
+    if (selectedBranches.length > 0) {
+      result = result.filter(m => m.branch_name && selectedBranches.includes(m.branch_name))
     }
 
     if (search.trim()) {
@@ -84,7 +103,7 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
     }
 
     return result
-  }, [members, search, branchFilter])
+  }, [members, search, selectedBranches])
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -113,17 +132,32 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
             <Button variant="outline" className="gap-2 shrink-0" />
           }>
               <Building2 className="h-4 w-4" />
-              {branchFilter ?? 'All Branches'}
+              {selectedBranches.length === 0 
+                ? 'All Branches' 
+                : `${selectedBranches.length} Selected`}
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setBranchFilter(null)}>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuCheckboxItem 
+              checked={selectedBranches.length === 0}
+              onCheckedChange={() => setSelectedBranches([])}
+            >
               All Branches
-            </DropdownMenuItem>
+            </DropdownMenuCheckboxItem>
             {branches.map(b => (
-              <DropdownMenuItem key={b} onClick={() => setBranchFilter(b)}>
+              <DropdownMenuCheckboxItem 
+                key={b} 
+                checked={selectedBranches.includes(b)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedBranches(prev => [...prev, b])
+                  } else {
+                    setSelectedBranches(prev => prev.filter(x => x !== b))
+                  }
+                }}
+              >
                 {b}
-              </DropdownMenuItem>
+              </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -134,7 +168,7 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
         <Users className="h-4 w-4" />
         <span>
           {filtered.length} member{filtered.length !== 1 ? 's' : ''}
-          {search || branchFilter ? ' found' : ' total'}
+          {search || selectedBranches.length > 0 ? ' found' : ' total'}
         </span>
       </div>
 

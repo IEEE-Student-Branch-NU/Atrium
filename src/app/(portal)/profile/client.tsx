@@ -225,10 +225,12 @@ function RequestPositionDialog({ branches }: { branches: BranchOption[] }) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [selectedBranch, setSelectedBranch] = useState<string>('')
+  const [selectedPosition, setSelectedPosition] = useState<string>('')
   const [positions, setPositions] = useState<PositionOption[]>([])
   const [loadingPositions, setLoadingPositions] = useState(false)
 
   useEffect(() => {
+    setSelectedPosition('')
     if (!selectedBranch) {
       setPositions([])
       return
@@ -257,7 +259,15 @@ function RequestPositionDialog({ branches }: { branches: BranchOption[] }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); setError(null); setSuccess(false) }}>
+    <Dialog open={open} onOpenChange={(v) => { 
+      setOpen(v); 
+      setError(null); 
+      setSuccess(false); 
+      if (!v) {
+        setSelectedBranch('');
+        setSelectedPosition('');
+      }
+    }}>
       <DialogTrigger render={<Button className="gap-2" />}>
         <Plus className="h-4 w-4" />
         Request New Position
@@ -287,9 +297,17 @@ function RequestPositionDialog({ branches }: { branches: BranchOption[] }) {
           </div>
           <div className="space-y-2">
             <Label>Desired Position</Label>
-            <Select name="positionId" required disabled={!selectedBranch || loadingPositions}>
+            <Select 
+              name="positionId" 
+              required 
+              disabled={!selectedBranch || loadingPositions}
+              value={selectedPosition}
+              onValueChange={(val) => setSelectedPosition(val || '')}
+            >
               <SelectTrigger>
-                <SelectValue placeholder={loadingPositions ? 'Loading...' : 'Select a position'} />
+                <SelectValue placeholder={loadingPositions ? 'Loading...' : 'Select a position'}>
+                  {selectedPosition && positions.find(p => p.id === selectedPosition)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {positions.map((p) => (

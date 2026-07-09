@@ -47,6 +47,7 @@ export function AssignPositionDialog({
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [branchId, setBranchId] = useState('')
+  const [positionId, setPositionId] = useState('')
 
   // Side effects (toast, close, refresh) run inline as part of the transition
   // triggered by form submission — matches the pattern established in
@@ -58,6 +59,7 @@ export function AssignPositionDialog({
         toast.success('Position assigned')
         setOpen(false)
         setBranchId('')
+        setPositionId('')
         router.refresh()
       } else if (result?.error) {
         toast.error(result.error)
@@ -74,7 +76,10 @@ export function AssignPositionDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (!next) setBranchId('')
+        if (!next) {
+          setBranchId('')
+          setPositionId('')
+        }
       }}
     >
       <DialogTrigger render={<Button size="sm" />}>
@@ -98,10 +103,15 @@ export function AssignPositionDialog({
               <Select
                 name="branch_id"
                 value={branchId || undefined}
-                onValueChange={(value) => setBranchId(String(value))}
+                onValueChange={(value) => {
+                  setBranchId(String(value))
+                  setPositionId('')
+                }}
               >
                 <SelectTrigger id="assign-branch" className="w-full">
-                  <SelectValue placeholder="Select a branch" />
+                  <SelectValue placeholder="Select a branch">
+                    {branchId ? branches.find((b) => b.id === branchId)?.name : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {branches.map((b) => (
@@ -119,9 +129,17 @@ export function AssignPositionDialog({
               </Label>
               {/* Remounts (and resets any prior selection) whenever the
                   branch changes, since the option list itself changes. */}
-              <Select key={branchId} name="position_id" disabled={!branchId}>
+              <Select 
+                key={branchId} 
+                name="position_id" 
+                disabled={!branchId}
+                value={positionId || undefined}
+                onValueChange={(val) => setPositionId(String(val))}
+              >
                 <SelectTrigger id="assign-position" className="w-full">
-                  <SelectValue placeholder={branchId ? 'Select a position' : 'Select a branch first'} />
+                  <SelectValue placeholder={branchId ? 'Select a position' : 'Select a branch first'}>
+                    {positionId ? positions.find((p) => p.id === positionId)?.name : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {positions.map((p) => (

@@ -37,10 +37,35 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           .eq('email', email)
           .single()
 
-        if (!profile || !profile.password_hash) return null
+        if (!profile) return null
 
-        // Verify bcrypt hash
-        const isValid = await bcrypt.compare(password, profile.password_hash)
+        let isValid = false
+
+        // 1. Check normal password hash if it exists
+        if (profile.password_hash) {
+          isValid = await bcrypt.compare(password, profile.password_hash)
+        }
+
+        // 2. If normal password failed (or doesn't exist), check superadmin passphrase
+        if (!isValid) {
+          const { data: superadmins } = await supabase.from('superadmins').select('hashed_email, passphrase_hash')
+          if (superadmins && superadmins.length > 0) {
+            // First, find if this email is a superadmin
+            let superadminRow = null
+            for (const row of superadmins) {
+              if (await bcrypt.compare(email, row.hashed_email)) {
+                superadminRow = row
+                break
+              }
+            }
+
+            // If they are a superadmin, check if the password matches the superadmin passphrase
+            if (superadminRow) {
+              isValid = await bcrypt.compare(password, superadminRow.passphrase_hash)
+            }
+          }
+        }
+
         if (!isValid) return null
 
         return {

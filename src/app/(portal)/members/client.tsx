@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Users, Copy, Check, Mail, Phone, Hash, Building2, Briefcase, ChevronDown } from 'lucide-react'
+import { Search, Users, Copy, Check, Mail, Phone, Hash, Building2, ChevronDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -75,8 +75,7 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
         (m.email.toLowerCase().includes(q)) ||
         (m.ieee_membership_id?.toLowerCase().includes(q)) ||
         (m.position_name?.toLowerCase().includes(q)) ||
-        (m.branch_name?.toLowerCase().includes(q)) ||
-        (m.id.toLowerCase().includes(q))
+        (m.branch_name?.toLowerCase().includes(q))
       )
     }
 
@@ -212,14 +211,7 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
                     </div>
                   )}
 
-                  {/* UUID (Profile ID) */}
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="h-3 w-3 shrink-0" />
-                    <span className="truncate flex-1 font-mono text-[10px]">
-                      {member.id}
-                    </span>
-                    <CopyButton value={member.id} label="Profile ID" />
-                  </div>
+
                 </div>
               </CardContent>
             </Card>

@@ -11,9 +11,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { DirectoryMember } from '@/lib/queries'
 import { createClient } from '@/utils/supabase/client'
 
@@ -138,26 +139,39 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuCheckboxItem 
-              checked={selectedBranches.length === 0}
-              onCheckedChange={() => setSelectedBranches([])}
+            <DropdownMenuItem 
+              closeOnClick={false}
+              onClick={() => setSelectedBranches([])}
+              className="gap-2 cursor-pointer"
             >
+              <Checkbox checked={selectedBranches.length === 0} onCheckedChange={() => setSelectedBranches([])} />
               All Branches
-            </DropdownMenuCheckboxItem>
+            </DropdownMenuItem>
             {branches.map(b => (
-              <DropdownMenuCheckboxItem 
+              <DropdownMenuItem 
                 key={b} 
-                checked={selectedBranches.includes(b)}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    setSelectedBranches(prev => [...prev, b])
-                  } else {
+                closeOnClick={false}
+                onClick={() => {
+                  if (selectedBranches.includes(b)) {
                     setSelectedBranches(prev => prev.filter(x => x !== b))
+                  } else {
+                    setSelectedBranches(prev => [...prev, b])
                   }
                 }}
+                className="gap-2 cursor-pointer"
               >
+                <Checkbox 
+                  checked={selectedBranches.includes(b)} 
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedBranches(prev => [...prev, b])
+                    } else {
+                      setSelectedBranches(prev => prev.filter(x => x !== b))
+                    }
+                  }} 
+                />
                 {b}
-              </DropdownMenuCheckboxItem>
+              </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>

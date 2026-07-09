@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Search, Users, Copy, Check, Mail, Phone, Hash, Building2, ChevronDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -51,6 +51,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 export function MembersDirectoryClient({ members }: { members: DirectoryMember[] }) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState<string | null>(null)
 
@@ -108,12 +109,12 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
         </div>
 
         <DropdownMenu>
-          <DropdownMenuTrigger>
-            <Button variant="outline" className="gap-2 shrink-0">
+          <DropdownMenuTrigger render={
+            <Button variant="outline" className="gap-2 shrink-0" />
+          }>
               <Building2 className="h-4 w-4" />
               {branchFilter ?? 'All Branches'}
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setBranchFilter(null)}>
@@ -153,8 +154,11 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((member) => (
-            <Link key={member.id} href={`/members/${member.id}`} className="block">
-              <Card className="group hover:border-primary/30 transition-colors cursor-pointer h-full">
+              <Card 
+                key={member.id}
+                className="group hover:border-primary/30 transition-colors cursor-pointer h-full"
+                onClick={() => router.push(`/members/${member.id}`)}
+              >
                 <CardContent className="p-4 space-y-3">
                   {/* Top: Avatar + Name + Position */}
                   <div className="flex items-start gap-3">
@@ -214,7 +218,6 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
                   </div>
                 </CardContent>
               </Card>
-            </Link>
           ))}
         </div>
       )}

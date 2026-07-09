@@ -29,7 +29,8 @@ export async function matchesSuperAdmin(
 export const isSuperAdmin = cache(async (email: string | null | undefined): Promise<boolean> => {
   if (!email) return false
   const supabase = createAdminClient()
-  const { data } = await supabase.from('superadmins').select('hashed_email')
+  const { data, error } = await supabase.from('superadmins').select('hashed_email')
+  if (error) console.error('isSuperAdmin: failed to load superadmins', error)
   if (!data || data.length === 0) return false
   return matchesSuperAdmin(email, data)
 })

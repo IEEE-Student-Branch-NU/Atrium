@@ -118,25 +118,23 @@ function SidebarContent({
                   : pathname.startsWith(item.href)
               const Icon = item.icon
 
-              const linkContent = (
-                <Link
-                  href={item.href}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
-                    isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-                  } ${collapsed ? 'justify-center px-2' : ''}`}
-                >
-                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-sidebar-primary' : ''}`} />
-                  {!collapsed && <span>{item.label}</span>}
-                </Link>
+              const linkClassName = `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
+                isActive
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+              } ${collapsed ? 'justify-center px-2' : ''}`
+
+              const iconEl = (
+                <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-sidebar-primary' : ''}`} />
               )
 
               if (collapsed) {
                 return (
                   <li key={item.href}>
                     <Tooltip>
-                      <TooltipTrigger>{linkContent}</TooltipTrigger>
+                      <TooltipTrigger render={<Link href={item.href} className={linkClassName} />}>
+                        {iconEl}
+                      </TooltipTrigger>
                       <TooltipContent side="right" sideOffset={8}>
                         {item.label}
                       </TooltipContent>
@@ -145,7 +143,14 @@ function SidebarContent({
                 )
               }
 
-              return <li key={item.href}>{linkContent}</li>
+              return (
+                <li key={item.href}>
+                  <Link href={item.href} className={linkClassName}>
+                    {iconEl}
+                    <span>{item.label}</span>
+                  </Link>
+                </li>
+              )
             })}
           </ul>
         </nav>
@@ -173,15 +178,17 @@ function SidebarContent({
           {!collapsed && (
             <form action={signOut}>
               <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-sidebar-foreground/50 hover:text-sidebar-foreground"
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                  </Button>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                    />
+                  }
+                >
+                  <LogOut className="h-3.5 w-3.5" />
                 </TooltipTrigger>
                 <TooltipContent side="right">Sign out</TooltipContent>
               </Tooltip>
@@ -227,14 +234,16 @@ export function SuperAdminSidebar({ user }: SuperAdminSidebarProps) {
 
       {/* Mobile Sidebar (Sheet) */}
       <Sheet>
-        <SheetTrigger>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="fixed left-4 top-4 z-40 md:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+        <SheetTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="fixed left-4 top-4 z-40 md:hidden"
+            />
+          }
+        >
+          <Menu className="h-5 w-5" />
         </SheetTrigger>
         <SheetContent side="left" className="w-64 bg-sidebar p-0 [&>button]:hidden">
           <SheetTitle className="sr-only">Navigation Menu</SheetTitle>

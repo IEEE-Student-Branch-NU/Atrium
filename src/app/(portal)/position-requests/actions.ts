@@ -15,18 +15,26 @@ export async function approvePositionRequest(requestId: string, adminComment?: s
   }
 
   const supabase = createAdminClient()
-  
-  // Verify admin permissions
-  const activeWorkspaceId = await getActiveWorkspace()
-  const profile = await getUserProfileWithMembership(session.user.id, activeWorkspaceId)
-  
-  if (!profile || !profile.branch_id) {
-    throw new Error('Invalid workspace')
-  }
 
-  const permissions = await getUserPermissions(supabase, profile.id, profile.branch_id, profile.membership_id)
-  if (!hasPermission(permissions, 'manage_positions')) {
-    throw new Error('Unauthorized to approve position requests')
+  // Verify admin permissions — skipped entirely for super admins, who are
+  // identified via the `superadmins` table and may have no branch
+  // membership at all. The decision below operates on the REQUEST's own
+  // branch_id/position_id, not the admin's, so this is safe to bypass.
+  let profile: Awaited<ReturnType<typeof getUserProfileWithMembership>> = null
+  let permissions: string[] = []
+
+  if (!session.isSuperAdmin) {
+    const activeWorkspaceId = await getActiveWorkspace()
+    profile = await getUserProfileWithMembership(session.user.id, activeWorkspaceId)
+
+    if (!profile || !profile.branch_id) {
+      throw new Error('Invalid workspace')
+    }
+
+    permissions = await getUserPermissions(supabase, profile.id, profile.branch_id, profile.membership_id)
+    if (!hasPermission(permissions, 'manage_positions')) {
+      throw new Error('Unauthorized to approve position requests')
+    }
   }
 
   // Get the request details
@@ -41,7 +49,7 @@ export async function approvePositionRequest(requestId: string, adminComment?: s
   }
 
   // Cross-branch check: if not superadmin, the admin must be in the same branch as the request
-  if (!permissions.includes('*') && request.branch_id !== profile.branch_id) {
+  if (!session.isSuperAdmin && !permissions.includes('*') && request.branch_id !== profile!.branch_id) {
     throw new Error('Unauthorized: Request is for a different branch')
   }
 
@@ -115,6 +123,7 @@ export async function approvePositionRequest(requestId: string, adminComment?: s
       action: 'position_request_approved',
       entityType: 'membership',
       entityId: requestId,
+      branchId: request.branch_id,
       summary: 'Decided a position request',
       details: null,
     })
@@ -137,18 +146,26 @@ export async function rejectPositionRequest(requestId: string, reason: string) {
   }
 
   const supabase = createAdminClient()
-  
-  // Verify admin permissions
-  const activeWorkspaceId = await getActiveWorkspace()
-  const profile = await getUserProfileWithMembership(session.user.id, activeWorkspaceId)
-  
-  if (!profile || !profile.branch_id) {
-    throw new Error('Invalid workspace')
-  }
 
-  const permissions = await getUserPermissions(supabase, profile.id, profile.branch_id, profile.membership_id)
-  if (!hasPermission(permissions, 'manage_positions')) {
-    throw new Error('Unauthorized to reject position requests')
+  // Verify admin permissions — skipped entirely for super admins, who are
+  // identified via the `superadmins` table and may have no branch
+  // membership at all. The decision below operates on the REQUEST's own
+  // branch_id/position_id, not the admin's, so this is safe to bypass.
+  let profile: Awaited<ReturnType<typeof getUserProfileWithMembership>> = null
+  let permissions: string[] = []
+
+  if (!session.isSuperAdmin) {
+    const activeWorkspaceId = await getActiveWorkspace()
+    profile = await getUserProfileWithMembership(session.user.id, activeWorkspaceId)
+
+    if (!profile || !profile.branch_id) {
+      throw new Error('Invalid workspace')
+    }
+
+    permissions = await getUserPermissions(supabase, profile.id, profile.branch_id, profile.membership_id)
+    if (!hasPermission(permissions, 'manage_positions')) {
+      throw new Error('Unauthorized to reject position requests')
+    }
   }
 
   // Get the request details
@@ -163,7 +180,7 @@ export async function rejectPositionRequest(requestId: string, reason: string) {
   }
 
   // Cross-branch check: if not superadmin, the admin must be in the same branch as the request
-  if (!permissions.includes('*') && request.branch_id !== profile.branch_id) {
+  if (!session.isSuperAdmin && !permissions.includes('*') && request.branch_id !== profile!.branch_id) {
     throw new Error('Unauthorized: Request is for a different branch')
   }
 
@@ -190,6 +207,7 @@ export async function rejectPositionRequest(requestId: string, reason: string) {
       action: 'position_request_rejected',
       entityType: 'membership',
       entityId: requestId,
+      branchId: request.branch_id,
       summary: 'Decided a position request',
       details: null,
     })

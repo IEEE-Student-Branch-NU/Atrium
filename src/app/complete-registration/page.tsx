@@ -144,7 +144,10 @@ export default function CompleteRegistrationPage() {
                     title="Format: +91 XXXXX XXXXX"
                     onChange={(e) => {
                       let val = e.target.value.replace(/[^\d]/g, '');
-                      if (val.startsWith('91')) val = val.substring(2);
+                      // Only strip a leading "91" when it's the country code
+                      // (i.e. there are extra digits). A valid 10-digit mobile
+                      // can itself start with 91, so don't chop it.
+                      if (val.length > 10 && val.startsWith('91')) val = val.substring(2);
                       if (val.length > 10) val = val.substring(0, 10);
                       let formatted = val.length > 0 ? '+91' : '';
                       if (val.length > 0) formatted += ' ' + val.substring(0, 5);

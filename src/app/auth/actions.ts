@@ -178,8 +178,8 @@ export async function completeRegistration(formData: FormData) {
     return { error: 'IEEE Membership ID must be 6-12 digits.' }
   }
 
-  if (phone && !/^\+91\s?\d{10}$/.test(phone)) {
-    return { error: 'Phone number must be a valid Indian mobile number (+91 followed by 10 digits).' }
+  if (phone && !/^\+91\s?\d{5}\s?\d{5}$/.test(phone)) {
+    return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
   }
 
   const supabase = createAdminClient()

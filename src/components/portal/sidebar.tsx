@@ -85,7 +85,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Registrations', href: '/approvals', icon: UserPlus, permission: 'approve_registrations' },
       { label: 'Position Requests', href: '/position-requests', icon: Briefcase, permission: 'manage_positions' },
       { label: 'Pre-Approved', href: '/pre-approved', icon: ShieldCheck, permission: 'approve_registrations' },
-      { label: 'Members', href: '/members', icon: Users, permission: 'view_members' },
+      { label: 'Members', href: '/members', icon: Users },
     ],
   },
   {

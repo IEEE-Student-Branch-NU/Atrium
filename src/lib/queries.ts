@@ -531,3 +531,63 @@ export async function getPreApprovedMembers(): Promise<PreApprovedMember[]> {
     is_claimed: claimedIds.has(item.ieee_membership_id),
   }))
 }
+
+// ── Members Directory ────────────────────────────────────────
+
+export interface DirectoryMember {
+  id: string
+  email: string
+  full_name: string | null
+  avatar_url: string | null
+  ieee_membership_id: string | null
+  phone: string | null
+  section: string | null
+  status: string
+  created_at: string
+  branch_name: string | null
+  position_name: string | null
+}
+
+export async function getMembersDirectory(): Promise<DirectoryMember[]> {
+  const supabase = createAdminClient()
+
+  // Fetch all approved profiles
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, email, full_name, avatar_url, ieee_membership_id, phone, section, status, created_at')
+    .eq('status', 'approved')
+    .order('full_name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching members directory:', error)
+    return []
+  }
+
+  if (!profiles || profiles.length === 0) return []
+
+  // Fetch active memberships for all profiles in one query
+  const profileIds = profiles.map(p => p.id)
+  const { data: memberships } = await supabase
+    .from('memberships')
+    .select('profile_id, branches(name), positions(name)')
+    .in('profile_id', profileIds)
+    .is('ended_at', null)
+
+  // Build a lookup: profile_id → { branch_name, position_name }
+  const membershipMap = new Map<string, { branch_name: string | null; position_name: string | null }>()
+  for (const m of memberships ?? []) {
+    // If a user has multiple memberships, prefer the one with a position
+    const existing = membershipMap.get(m.profile_id)
+    const posName = (m.positions as any)?.name ?? null
+    const branchName = (m.branches as any)?.name ?? null
+    if (!existing || (posName && !existing.position_name)) {
+      membershipMap.set(m.profile_id, { branch_name: branchName, position_name: posName })
+    }
+  }
+
+  return profiles.map(p => ({
+    ...p,
+    branch_name: membershipMap.get(p.id)?.branch_name ?? null,
+    position_name: membershipMap.get(p.id)?.position_name ?? null,
+  }))
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { Search, Users, Copy, Check, Mail, Phone, Hash, Building2, ChevronDown } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -28,7 +29,9 @@ function getInitials(name: string | null): string {
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false)
 
-  function handleCopy() {
+  function handleCopy(e: React.MouseEvent) {
+    e.preventDefault()  // Prevent card navigation
+    e.stopPropagation()
     navigator.clipboard.writeText(value)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -97,7 +100,7 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, email, IEEE ID, position, or UUID..."
+            placeholder="Search by name, email, IEEE ID, position, or branch..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -150,71 +153,68 @@ export function MembersDirectoryClient({ members }: { members: DirectoryMember[]
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((member) => (
-            <Card
-              key={member.id}
-              className="group hover:border-primary/30 transition-colors"
-            >
-              <CardContent className="p-4 space-y-3">
-                {/* Top: Avatar + Name + Position */}
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-10 w-10 shrink-0">
-                    <AvatarImage src={member.avatar_url ?? undefined} alt={member.full_name ?? ''} />
-                    <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
-                      {getInitials(member.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">
-                      {member.full_name ?? 'Unnamed'}
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {member.position_name && (
-                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                          {member.position_name}
-                        </Badge>
-                      )}
-                      {member.branch_name && (
-                        <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                          {member.branch_name}
-                        </Badge>
-                      )}
+            <Link key={member.id} href={`/members/${member.id}`} className="block">
+              <Card className="group hover:border-primary/30 transition-colors cursor-pointer h-full">
+                <CardContent className="p-4 space-y-3">
+                  {/* Top: Avatar + Name + Position */}
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-10 w-10 shrink-0">
+                      <AvatarImage src={member.avatar_url ?? undefined} alt={member.full_name ?? ''} />
+                      <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+                        {getInitials(member.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                        {member.full_name ?? 'Unnamed'}
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {member.position_name && (
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                            {member.position_name}
+                          </Badge>
+                        )}
+                        {member.branch_name && (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                            {member.branch_name}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Info rows */}
-                <div className="space-y-1.5 text-xs text-muted-foreground">
-                  {/* Email */}
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-3 w-3 shrink-0" />
-                    <span className="truncate flex-1">{member.email}</span>
-                    <CopyButton value={member.email} label="email" />
+                  {/* Info rows */}
+                  <div className="space-y-1.5 text-xs text-muted-foreground">
+                    {/* Email */}
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-3 w-3 shrink-0" />
+                      <span className="truncate flex-1">{member.email}</span>
+                      <CopyButton value={member.email} label="email" />
+                    </div>
+
+                    {/* Phone */}
+                    {member.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-3 w-3 shrink-0" />
+                        <span className="truncate flex-1">{member.phone}</span>
+                        <CopyButton value={member.phone} label="phone" />
+                      </div>
+                    )}
+
+                    {/* IEEE ID */}
+                    {member.ieee_membership_id && (
+                      <div className="flex items-center gap-2">
+                        <Hash className="h-3 w-3 shrink-0" />
+                        <span className="truncate flex-1 font-mono">
+                          IEEE: {member.ieee_membership_id}
+                        </span>
+                        <CopyButton value={member.ieee_membership_id} label="IEEE ID" />
+                      </div>
+                    )}
                   </div>
-
-                  {/* Phone */}
-                  {member.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-3 w-3 shrink-0" />
-                      <span className="truncate flex-1">{member.phone}</span>
-                      <CopyButton value={member.phone} label="phone" />
-                    </div>
-                  )}
-
-                  {/* IEEE ID */}
-                  {member.ieee_membership_id && (
-                    <div className="flex items-center gap-2">
-                      <Hash className="h-3 w-3 shrink-0" />
-                      <span className="truncate flex-1 font-mono">
-                        IEEE: {member.ieee_membership_id}
-                      </span>
-                      <CopyButton value={member.ieee_membership_id} label="IEEE ID" />
-                    </div>
-                  )}
-
-
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

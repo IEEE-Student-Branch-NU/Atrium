@@ -67,7 +67,11 @@ Atrium/
 │       ├── 00001_initial_schema.sql
 │       ├── 00002_permission_system.sql
 │       ├── 00003_nextauth_migration.sql
-│       └── 00004_invisible_superadmin.sql
+│       ├── 00004_invisible_superadmin.sql
+│       ├── 00005_new_positions.sql
+│       ├── 00006_workspace_and_requests.sql
+│       ├── 00007_notification_types.sql
+│       └── 00008_audit_log.sql
 │
 ├── src/
 │   ├── app/
@@ -80,7 +84,7 @@ Atrium/
 │   │   ├── complete-registration/ #    IEEE details form (Google OAuth users)
 │   │   ├── pending/               #    Waiting room for unapproved accounts
 │   │   ├── rejected/              #    Rejection notice with reason
-│   │   ├── sudo/                  #    SuperAdmin elevation (hidden)
+│   │   ├── superadmin/            #    SuperAdmin portal (dashboard, orgs, users, positions, requests, audit, settings)
 │   │   ├── layout.tsx             #    Root layout
 │   │   └── globals.css            #    Theme variables & base styles
 │   │
@@ -92,7 +96,9 @@ Atrium/
 │   ├── utils/
 │   │   ├── auth/
 │   │   │   ├── permissions.ts     #    Permission engine (position + direct grants)
-│   │   │   └── sudo.ts            #    Sudo mode JWT cookie management
+│   │   │   ├── superadmin.ts      #    SuperAdmin identity check (bcrypt-matched email → session.isSuperAdmin)
+│   │   │   ├── audit.ts           #    logAdminAction() — writes to audit_log
+│   │   │   └── impersonation.ts   #    Workspace impersonation (SuperAdmin "view as member")
 │   │   └── supabase/
 │   │       ├── server.ts          #    createAdminClient() (service role)
 │   │       └── middleware.ts      #    Auth middleware (route protection)
@@ -113,7 +119,7 @@ Atrium/
 
 | Document | Description |
 |----------|-------------|
-| **[AUTH.md](docs/AUTH.md)** | Complete authentication & authorization reference. Covers Google OAuth flow, email/password signup, middleware route protection, permission engine, sudo mode, and security considerations. Includes Mermaid diagrams for every flow. |
+| **[AUTH.md](docs/AUTH.md)** | Complete authentication & authorization reference. Covers Google OAuth flow, email/password signup, middleware route protection, permission engine, and security considerations. Includes Mermaid diagrams for every flow. *(Note: AUTH.md itself still describes the retired passphrase-based "sudo mode" — see [docs/SCHEMA.md §1.7](docs/SCHEMA.md#17-invisible-superadmin-identity-no-profiles-flag) for the current invisible-SuperAdmin model; a follow-up pass on AUTH.md is flagged but out of scope here.)* |
 | **[SCHEMA.md](docs/SCHEMA.md)** | Database schema reference (v2). Every table, enum, trigger, index, and seed record — with ERD, permission matrix, and key query patterns. The single source of truth for the database. |
 
 ---
@@ -172,6 +178,10 @@ Run the migrations **in order** in your Supabase SQL editor:
 2. `supabase/migrations/00002_permission_system.sql` — Permissions, position_permissions, pre-approval
 3. `supabase/migrations/00003_nextauth_migration.sql` — NextAuth-specific columns (password_hash)
 4. `supabase/migrations/00004_invisible_superadmin.sql` — Superadmins table
+5. `supabase/migrations/00005_new_positions.sql` — Seeds Web Master, Treasurer, Technical Associate, Marketing Associate positions
+6. `supabase/migrations/00006_workspace_and_requests.sql` — position_requests, notifications tables
+7. `supabase/migrations/00007_notification_types.sql` — notifications.type column
+8. `supabase/migrations/00008_audit_log.sql` — Unified `audit_log` table for the SuperAdmin portal (required for `/superadmin/audit` to show data)
 
 ### 5. Start Development Server
 
@@ -291,8 +301,11 @@ In the Google Cloud Console, add these to your OAuth Client:
 | 1 | `00001_initial_schema.sql` | Core tables: profiles, branches, positions, memberships, events, event_types, event_approvals, audit logs. Seeded branches and positions. |
 | 2 | `00002_permission_system.sql` | Permission engine: permissions, position_permissions, member_permissions, pre_approved_members. Dropped old portal_role enum. Full permission matrix seed. |
 | 3 | `00003_nextauth_migration.sql` | Added password_hash to profiles. NextAuth compatibility columns. |
-| 4 | `00004_invisible_superadmin.sql` | Created superadmins table with bcrypt-hashed emails and passphrases. |
+| 4 | `00004_invisible_superadmin.sql` | Created `superadmins` table (bcrypt-hashed emails + passphrase hash), RLS enabled with no public policies. **Dropped `profiles.is_super_admin`** — SuperAdmin status is no longer a queryable column. |
 | 5 | `00005_new_positions.sql` | Seed script for adding missing standard roles: Web Master, Treasurer, Technical Associate, Marketing Associate, and granting basic permissions. |
+| 6 | `00006_workspace_and_requests.sql` | Added `bio`/`skills` to profiles. Added `position_requests` table (member-initiated requests to hold a position) and `notifications` table. |
+| 7 | `00007_notification_types.sql` | Added `notifications.type` column (normal, broadcast, success, warning, error). |
+| 8 | `00008_audit_log.sql` | Added unified `audit_log` table recording super-admin/structural actions (branch/position/permission changes, workspace impersonation, etc.), with indexes on `created_at`, `actor_profile_id`, and `(entity_type, entity_id)`. RLS enabled with no public policies (service-role only). |
 
 ---
 

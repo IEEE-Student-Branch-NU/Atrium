@@ -93,38 +93,36 @@ function SidebarContent({
     <div className="flex h-full flex-col">
       {/* Branding */}
       <div 
-        className={`flex h-16 items-center gap-3 border-b border-sidebar-border ${collapsed ? 'justify-center px-0' : 'px-4'} ${onToggleCollapse ? 'cursor-pointer hover:bg-sidebar-accent/50 transition-colors' : ''}`}
+        className={`flex h-16 items-center px-4 border-b border-sidebar-border overflow-hidden whitespace-nowrap ${onToggleCollapse ? 'cursor-pointer hover:bg-sidebar-accent/50 transition-colors' : ''}`}
         onClick={onToggleCollapse}
       >
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
           <Landmark className="h-5 w-5" />
         </div>
-        {!collapsed && (
-          <>
-            <div className="flex flex-1 flex-col gap-0.5">
-              <span className="text-sm font-semibold text-sidebar-foreground">Atrium</span>
-              <Badge
-                variant="destructive"
-                className="h-4 w-fit px-1.5 text-[9px] font-semibold tracking-wide"
-              >
-                SUPER ADMIN
-              </Badge>
-            </div>
-            {onToggleCollapse && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-sidebar-foreground/50 hover:text-sidebar-foreground"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleCollapse();
-                }}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            )}
-          </>
-        )}
+        <div className={`flex flex-1 items-center gap-2 overflow-hidden transition-all duration-300 ${collapsed ? 'w-0 opacity-0 ml-0' : 'w-full opacity-100 ml-3'}`}>
+          <div className="flex flex-1 flex-col gap-0.5 overflow-hidden">
+            <span className="text-sm font-semibold text-sidebar-foreground truncate">Atrium</span>
+            <Badge
+              variant="destructive"
+              className="h-4 w-fit px-1.5 text-[9px] font-semibold tracking-wide"
+            >
+              SUPER ADMIN
+            </Badge>
+          </div>
+          {onToggleCollapse && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCollapse();
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Navigation */}
@@ -138,23 +136,30 @@ function SidebarContent({
                   : pathname.startsWith(item.href)
               const Icon = item.icon
 
-              const linkClassName = `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
+              const linkClassName = `flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 overflow-hidden whitespace-nowrap ${
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
                   : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              } ${collapsed ? 'justify-center px-2' : ''}`
+              }`
 
               const iconEl = (
                 <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-sidebar-primary' : ''}`} />
+              )
+
+              const linkContent = (
+                <Link href={item.href} className={linkClassName}>
+                  {iconEl}
+                  <div className={`flex flex-1 items-center overflow-hidden transition-all duration-300 ${collapsed ? 'w-0 opacity-0 ml-0' : 'w-full opacity-100 ml-3'}`}>
+                    <span>{item.label}</span>
+                  </div>
+                </Link>
               )
 
               if (collapsed) {
                 return (
                   <li key={item.href}>
                     <Tooltip>
-                      <TooltipTrigger render={<Link href={item.href} className={linkClassName} />}>
-                        {iconEl}
-                      </TooltipTrigger>
+                      <TooltipTrigger render={linkContent} />
                       <TooltipContent side="right" sideOffset={8}>
                         {item.label}
                       </TooltipContent>
@@ -165,10 +170,7 @@ function SidebarContent({
 
               return (
                 <li key={item.href}>
-                  <Link href={item.href} className={linkClassName}>
-                    {iconEl}
-                    <span>{item.label}</span>
-                  </Link>
+                  {linkContent}
                 </li>
               )
             })}
@@ -177,15 +179,15 @@ function SidebarContent({
       </ScrollArea>
 
       {/* User Card */}
-      <div className="border-t border-sidebar-border p-3">
-        <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
-          <Avatar className="h-8 w-8 shrink-0">
+      <div className="border-t border-sidebar-border p-3 overflow-hidden whitespace-nowrap">
+        <div className="flex items-center">
+          <Avatar className="h-8 w-8 shrink-0 ml-1">
             <AvatarImage src={user.image ?? undefined} alt={user.name ?? ''} />
             <AvatarFallback className="bg-sidebar-accent text-xs font-medium">
               {getInitials(user.name)}
             </AvatarFallback>
           </Avatar>
-          {!collapsed && (
+          <div className={`flex flex-1 items-center gap-3 overflow-hidden transition-all duration-300 ${collapsed ? 'w-0 opacity-0 ml-0' : 'w-full opacity-100 ml-3'}`}>
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-medium text-sidebar-foreground">
                 {user.name ?? 'Super Admin'}
@@ -194,8 +196,6 @@ function SidebarContent({
                 {user.email}
               </span>
             </div>
-          )}
-          {!collapsed && (
             <form action={signOut}>
               <Tooltip>
                 <TooltipTrigger
@@ -213,7 +213,7 @@ function SidebarContent({
                 <TooltipContent side="right">Sign out</TooltipContent>
               </Tooltip>
             </form>
-          )}
+          </div>
         </div>
       </div>
     </div>

@@ -328,7 +328,7 @@ function SidebarContent({
                       return (
                         <li key={item.href}>
                           <Tooltip>
-                            <TooltipTrigger >{linkContent}</TooltipTrigger>
+                            <TooltipTrigger render={linkContent} />
                             <TooltipContent side="right" sideOffset={8}>
                               {item.label}
                             </TooltipContent>
@@ -377,7 +377,7 @@ function SidebarContent({
           {!collapsed && (
             <form action={signOut}>
               <Tooltip>
-                <TooltipTrigger >
+                <TooltipTrigger render={
                   <Button
                     type="submit"
                     variant="ghost"
@@ -386,7 +386,7 @@ function SidebarContent({
                   >
                     <LogOut className="h-3.5 w-3.5" />
                   </Button>
-                </TooltipTrigger>
+                } />
                 <TooltipContent side="right">Sign out</TooltipContent>
               </Tooltip>
             </form>
@@ -437,7 +437,7 @@ export function Sidebar({ user, permissions, memberships, activeMembershipId }: 
 
       {/* Mobile Sidebar (Sheet) */}
       <Sheet>
-        <SheetTrigger >
+        <SheetTrigger render={
           <Button
             variant="ghost"
             size="icon"
@@ -445,7 +445,7 @@ export function Sidebar({ user, permissions, memberships, activeMembershipId }: 
           >
             <Menu className="h-5 w-5" />
           </Button>
-        </SheetTrigger>
+        } />
         <SheetContent side="left" className="w-64 bg-sidebar p-0 [&>button]:hidden">
           <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
           <SidebarContent

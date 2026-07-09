@@ -463,7 +463,7 @@ Immutable log of all membership/role/position changes.
 ---
 
 ### 4.14 `audit_log`
-*(Added in migration `00008_audit_log.sql`.)* Unified, append-only log of super-admin / structural actions taken through the SuperAdmin portal (`/superadmin/**`) — e.g. creating a branch, assigning/removing a position, granting/revoking a permission, positions CRUD, deciding a position request, entering/exiting workspace impersonation. Distinct from `event_audit_log` (event lifecycle) and `membership_audit_log` (role/position changes made by regular admins/MDOs in their own branch) — `audit_log` specifically captures actions performed via the SuperAdmin portal. Written by `logAdminAction()` in `src/utils/auth/audit.ts`, which is a **best-effort** write (failures are logged and swallowed — a failed audit insert never blocks or throws into the calling action).
+*(Added in migration `00008_audit_log.sql`.)* Unified, append-only log of super-admin / structural actions taken through the SuperAdmin portal (`/superadmin/**`) — e.g. creating a branch, assigning/removing a position, granting/revoking a permission, positions CRUD, deciding a position request, entering/exiting workspace impersonation. It **complements — and for some actions overlaps with —** the two older audit tables rather than replacing them: `event_audit_log` (event lifecycle) and `membership_audit_log` (all membership/role/position changes, plus some self-service events such as a user's own password change in `src/app/(portal)/profile/actions.ts` and workspace switches in `src/app/(portal)/actions.ts`). In particular, super-admin position assign/remove (`assignPosition`/`removePosition` in `src/app/superadmin/actions.ts`) are recorded in **both** `membership_audit_log` (tagged `details.via: 'super_admin'`) **and** `audit_log`, so for those actions the two tables are not disjoint. Written by `logAdminAction()` in `src/utils/auth/audit.ts`, which is a **best-effort** write (failures are logged and swallowed — a failed audit insert never blocks or throws into the calling action).
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
@@ -579,14 +579,24 @@ SuperAdmin status is **not** a queryable column — it's resolved at sign-in by 
 
 ```ts
 // src/utils/auth/superadmin.ts
-export const isSuperAdmin = cache(async (email: string | null | undefined) => {
-  if (!email) return false
-  const { data } = await supabase.from('superadmins').select('hashed_email')
-  if (!data || data.length === 0) return false
-  for (const row of data) {
+// Pure, unit-testable matcher — bcrypt-compares the email against each row.
+export async function matchesSuperAdmin(
+  email: string,
+  rows: { hashed_email: string }[]
+): Promise<boolean> {
+  for (const row of rows) {
     if (await bcrypt.compare(email, row.hashed_email)) return true
   }
   return false
+}
+
+// IO wrapper — fetches the superadmins rows (service role) then delegates. Memoized per request.
+export const isSuperAdmin = cache(async (email: string | null | undefined): Promise<boolean> => {
+  if (!email) return false
+  const supabase = createAdminClient()
+  const { data } = await supabase.from('superadmins').select('hashed_email')
+  if (!data || data.length === 0) return false
+  return matchesSuperAdmin(email, data)
 })
 ```
 

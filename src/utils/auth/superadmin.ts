@@ -14,12 +14,10 @@ export type { EffectiveActor } from '@/utils/auth/effective-actor'
  */
 export async function matchesSuperAdmin(
   email: string,
-  rows: { hashed_email: string }[]
+  rows: { email: string }[]
 ): Promise<boolean> {
-  for (const row of rows) {
-    if (await bcrypt.compare(email, row.hashed_email)) return true
-  }
-  return false
+  // Now we just do a direct string match since emails are stored directly.
+  return rows.some(row => row.email.toLowerCase() === email.toLowerCase())
 }
 
 /**
@@ -29,7 +27,7 @@ export async function matchesSuperAdmin(
 export const isSuperAdmin = cache(async (email: string | null | undefined): Promise<boolean> => {
   if (!email) return false
   const supabase = createAdminClient()
-  const { data, error } = await supabase.from('superadmins').select('hashed_email')
+  const { data, error } = await supabase.from('superadmins').select('email')
   if (error) console.error('isSuperAdmin: failed to load superadmins', error)
   if (!data || data.length === 0) return false
   return matchesSuperAdmin(email, data)

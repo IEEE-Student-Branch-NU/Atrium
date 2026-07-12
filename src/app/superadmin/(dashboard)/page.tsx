@@ -167,7 +167,7 @@ export default async function SuperAdminDashboardPage() {
                 <p className="mt-2 text-sm text-muted-foreground">No organizations yet.</p>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-1 max-h-[400px] overflow-y-auto pr-2">
                 {orgTree.map((root) => (
                   <OrgTreeRow key={root.id} node={root} depth={0} />
                 ))}
@@ -191,7 +191,7 @@ export default async function SuperAdminDashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                 {activity.map((item) => (
                   <div
                     key={item.id}

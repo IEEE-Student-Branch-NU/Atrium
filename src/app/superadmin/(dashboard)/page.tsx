@@ -74,11 +74,16 @@ function OrgTreeRow({ node, depth }: { node: OrgNode; depth: number }) {
 // ── Page ─────────────────────────────────────────────────────
 
 export default async function SuperAdminDashboardPage() {
-  const [stats, orgTree, activity] = await Promise.all([
+  const [stats, orgTree, activity, branchesResult, positionsResult] = await Promise.all([
     getSuperAdminStats(),
     getOrganizationTree(),
     getRecentActivityFeed(8),
+    createAdminClient().from('branches').select('id, name').order('name'),
+    createAdminClient().from('positions').select('id, name').order('name')
   ])
+
+  const branches = branchesResult.data ?? []
+  const positions = positionsResult.data ?? []
 
   const statCards = [
     { label: 'Total Users', value: stats.totalUsers, icon: Users, href: '/superadmin/users' },
@@ -113,12 +118,10 @@ export default async function SuperAdminDashboardPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Super Admin Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Organization-wide overview across every branch and member.
-          </p>
+          <h2 className="text-2xl font-bold tracking-tight">Superadmin Dashboard</h2>
+          <p className="text-muted-foreground">Platform overview and recent activity</p>
         </div>
-        <SendBroadcastDialog />
+        <SendBroadcastDialog branches={branches} positions={positions} />
       </div>
 
       {/* Stat Grid */}

@@ -333,30 +333,70 @@ export async function sendBroadcastMessage(formData: FormData) {
   const message = String(formData.get('message') ?? '').trim()
   const type = String(formData.get('type') ?? 'info')
 
+  let targetBranches: string[] = []
+  let targetPositions: string[] = []
+  try {
+    const b = formData.get('branches')
+    if (b) targetBranches = JSON.parse(String(b))
+    const p = formData.get('positions')
+    if (p) targetPositions = JSON.parse(String(p))
+  } catch {
+    // ignore
+  }
+
   if (!title || !message) {
     return { error: 'Title and message are required' }
   }
 
   const supabase = createAdminClient()
   
-  // Get all profile IDs
-  const { data: profiles, error: fetchError } = await supabase
-    .from('profiles')
-    .select('id')
+  const targetProfileIds = new Set<string>()
 
-  if (fetchError || !profiles || profiles.length === 0) {
-    return { error: 'Failed to fetch users or no users found' }
+  if (targetBranches.length === 0 && targetPositions.length === 0) {
+    // Send to everyone
+    const { data: profiles, error: fetchError } = await supabase.from('profiles').select('id')
+    if (fetchError || !profiles || profiles.length === 0) {
+      return { error: 'Failed to fetch users or no users found' }
+    }
+    profiles.forEach(p => targetProfileIds.add(p.id))
+  } else {
+    // Filter by memberships
+    let query = supabase.from('memberships').select('profile_id').is('ended_at', null)
+    if (targetBranches.length > 0) {
+      query = query.in('branch_id', targetBranches)
+    }
+    if (targetPositions.length > 0) {
+      query = query.in('position_id', targetPositions)
+    }
+    
+    const { data: memberships, error } = await query
+    if (error || !memberships || memberships.length === 0) {
+      return { error: 'No active users match the selected filters.' }
+    }
+    memberships.forEach(m => targetProfileIds.add(m.profile_id))
+  }
+
+  const profileIdsArray = Array.from(targetProfileIds)
+
+  if (profileIdsArray.length === 0) {
+    return { error: 'No active users match the selected filters.' }
+  }
+
+  const target_filters = {
+    branches: targetBranches.length > 0 ? targetBranches : null,
+    positions: targetPositions.length > 0 ? targetPositions : null,
   }
 
   // Bulk insert notifications
   const broadcast_id = crypto.randomUUID()
-  const notifications = profiles.map(p => ({
+  const notifications = profileIdsArray.map(id => ({
     broadcast_id,
-    profile_id: p.id,
+    profile_id: id,
     title,
     message,
     type,
-    is_read: false
+    is_read: false,
+    target_filters
   }))
 
   // Insert in chunks to avoid hitting payload limits if user count grows

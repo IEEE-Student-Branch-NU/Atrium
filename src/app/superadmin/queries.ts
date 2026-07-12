@@ -391,7 +391,7 @@ export async function getAllNotifications(limit = 100) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('admin_notification_history')
-    .select('id, broadcast_id, title, message, type, created_at, recipient_count, read_count, single_profile_id, is_edited')
+    .select('id, broadcast_id, title, message, type, created_at, recipient_count, read_count, single_profile_id, is_edited, target_filters')
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -402,7 +402,7 @@ export async function getAllNotifications(limit = 100) {
 
   // Enrich personal notifications with profile info
   const profileIds = data.map(n => n.single_profile_id).filter(Boolean) as string[]
-  let profilesMap = new Map<string, { full_name: string, email: string }>()
+  const profilesMap = new Map<string, { full_name: string, email: string }>()
   
   if (profileIds.length > 0) {
     const { data: profiles } = await supabase

@@ -145,7 +145,11 @@ export function NotificationsList({ notifications }: { notifications: any[] }) {
                   <TableCell>
                     {isBroadcast ? (
                       <div className="flex flex-col">
-                        <Badge variant="secondary" className="w-fit">Global Broadcast</Badge>
+                        {n.target_filters ? (
+                           <Badge variant="secondary" className="w-fit border-blue-200 bg-blue-50 text-blue-700">Targeted Broadcast</Badge>
+                        ) : (
+                           <Badge variant="secondary" className="w-fit">Global Broadcast</Badge>
+                        )}
                         <span className="text-xs text-muted-foreground mt-1">{n.recipient_count} recipients</span>
                       </div>
                     ) : (

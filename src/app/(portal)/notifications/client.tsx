@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Notification } from '@/lib/queries'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Bell, Check, Clock, ExternalLink, Send, Info, AlertTriangle, CheckCircle, XCircle, Megaphone } from 'lucide-react'
 import { markAsRead, markAllAsRead, sendBroadcast } from './actions'
@@ -136,8 +137,11 @@ export function NotificationsClient({
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Icon className={cn("h-5 w-5", style.colorClass)} />
-                    <h4 className={cn("text-base font-semibold", !notification.is_read ? "text-foreground" : "text-foreground/80")}>
+                    <h4 className={cn("text-base font-semibold flex items-center gap-2", !notification.is_read ? "text-foreground" : "text-foreground/80")}>
                       {notification.title}
+                      {notification.is_edited && (
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-normal">Edited</Badge>
+                      )}
                     </h4>
                   </div>
                   <p className="text-sm text-muted-foreground/90 pl-7 sm:pl-7">

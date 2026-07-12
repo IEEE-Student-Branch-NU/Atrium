@@ -8,7 +8,8 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Check, X, Clock, Mail, User, Briefcase, Building2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Check, X, Clock, Mail, User, Briefcase, Building2, Search, Slash } from 'lucide-react'
 import { approvePositionRequest, rejectPositionRequest } from './actions'
 import { toast } from 'sonner'
 import {
@@ -20,57 +21,31 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-
+import { UpdateRequestDialog } from '@/components/position-requests/update-request-dialog'
+import { RequesterProfileDialog } from '@/components/position-requests/requester-profile-dialog'
 // ── Request Card ──────────────────────────────────────────────
 
 function RequestCard({ request }: { request: PositionRequest }) {
-  const [isRejectOpen, setIsRejectOpen] = useState(false)
-  const [rejectReason, setRejectReason] = useState('')
-  const [isApproveOpen, setIsApproveOpen] = useState(false)
-  const [approveComment, setApproveComment] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  async function handleApprove() {
-    setIsSubmitting(true)
-    try {
-      await approvePositionRequest(request.id, approveComment)
-      toast.success(`${request.profile_name}'s request for ${request.position_name} has been approved!`)
-      setIsApproveOpen(false)
-    } catch (error: any) {
-      toast.error(error.message)
-      setIsSubmitting(false)
-    }
-  }
-
-  async function handleReject() {
-    if (!rejectReason.trim()) {
-      toast.error('Please provide a reason for rejection')
-      return
-    }
-    setIsSubmitting(true)
-    try {
-      await rejectPositionRequest(request.id, rejectReason)
-      toast.success(`${request.profile_name}'s request was rejected.`)
-      setIsRejectOpen(false)
-    } catch (error: any) {
-      toast.error(error.message)
-      setIsSubmitting(false)
-    }
-  }
-
   return (
     <>
       <Card className="flex flex-col md:flex-row overflow-hidden border-border/50 bg-card/50">
         <div className="flex-1 p-5 space-y-4">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-lg font-semibold">{request.profile_name ?? 'Unknown User'}</h3>
+              <RequesterProfileDialog request={request}>
+                <button className="text-lg font-semibold hover:underline text-left">
+                  {request.profile_name ?? 'Unknown User'}
+                </button>
+              </RequesterProfileDialog>
               <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
                 <Mail className="h-3.5 w-3.5" /> {request.profile_email}
               </p>
             </div>
-            <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20">
-              Pending
+            <Badge 
+              variant={request.status === 'cancelled' ? 'destructive' : 'secondary'} 
+              className={request.status === 'pending' ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20' : ''}
+            >
+              {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
             </Badge>
           </div>
 
@@ -124,87 +99,13 @@ function RequestCard({ request }: { request: PositionRequest }) {
 
         {/* Actions Sidebar */}
         <div className="bg-muted/30 md:w-48 p-5 flex flex-row md:flex-col gap-3 justify-center border-t md:border-t-0 md:border-l border-border/50">
-          <Button
-            className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => setIsApproveOpen(true)}
-            disabled={isSubmitting}
-          >
-            <Check className="mr-2 h-4 w-4" />
-            Approve
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 md:flex-none text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-            onClick={() => setIsRejectOpen(true)}
-            disabled={isSubmitting}
-          >
-            <X className="mr-2 h-4 w-4" />
-            Reject
-          </Button>
+          <UpdateRequestDialog 
+            requestId={request.id} 
+            currentStatus={request.status} 
+            currentComment={request.admin_comment} 
+          />
         </div>
       </Card>
-
-      {/* Approve Dialog */}
-      <Dialog open={isApproveOpen} onOpenChange={setIsApproveOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Approve Position Request</DialogTitle>
-            <DialogDescription>
-              Assign the position of <strong>{request.position_name}</strong> in <strong>{request.branch_name}</strong> to <strong>{request.profile_name}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Admin Comment (Optional)</label>
-              <Textarea
-                placeholder="e.g. Welcome to the team! Make sure to check the drive for handover documents."
-                value={approveComment}
-                onChange={(e) => setApproveComment(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsApproveOpen(false)} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            <Button onClick={handleApprove} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {isSubmitting ? 'Approving...' : 'Confirm Assignment'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reject Dialog */}
-      <Dialog open={isRejectOpen} onOpenChange={setIsRejectOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject Position Request</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejecting <strong>{request.profile_name}</strong> for this position. This will be shown to them.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Rejection Reason *</label>
-              <Textarea
-                placeholder="e.g. We are currently not accepting applications for this position. Please try again next semester."
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRejectOpen(false)} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleReject} disabled={isSubmitting}>
-              {isSubmitting ? 'Rejecting...' : 'Reject Request'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }
@@ -213,37 +114,97 @@ function RequestCard({ request }: { request: PositionRequest }) {
 
 interface PositionRequestsClientProps {
   requests: PositionRequest[]
+  cancelledRequests: PositionRequest[]
+  decidedRequests: PositionRequest[]
 }
 
-export function PositionRequestsClient({ requests }: PositionRequestsClientProps) {
+export function PositionRequestsClient({ 
+  requests, 
+  cancelledRequests, 
+  decidedRequests 
+}: PositionRequestsClientProps) {
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const filterRequest = (req: PositionRequest) => {
+    const term = searchTerm.toLowerCase()
+    return (
+      (req.profile_name ?? '').toLowerCase().includes(term) ||
+      (req.profile_email ?? '').toLowerCase().includes(term) ||
+      (req.position_name ?? '').toLowerCase().includes(term) ||
+      (req.branch_name ?? '').toLowerCase().includes(term)
+    )
+  }
+
+  const filteredPending = requests.filter(filterRequest)
+  const filteredCancelled = cancelledRequests.filter(filterRequest)
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Position Requests</h2>
-        <p className="text-muted-foreground">
-          Review and manage user requests for new positions within your branch.
-        </p>
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Position Requests</h2>
+          <p className="text-muted-foreground">
+            Review and manage user requests for new positions within your branch.
+          </p>
+        </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search requests..."
+            className="pl-9 bg-card/50"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="mt-6 space-y-4">
-        {requests.length === 0 ? (
+        <h3 className="text-lg font-medium">Pending Requests</h3>
+        {filteredPending.length === 0 ? (
           <Card className="border-dashed bg-card/30">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
                 <Check className="h-6 w-6 text-emerald-500" />
               </div>
-              <h3 className="text-lg font-medium">All caught up!</h3>
+              <h3 className="text-lg font-medium">No pending requests</h3>
               <p className="text-sm text-muted-foreground max-w-sm mt-1">
-                There are no pending position requests waiting for your approval.
+                {searchTerm ? 'Try adjusting your search terms.' : 'There are no pending position requests waiting for your approval.'}
               </p>
             </CardContent>
           </Card>
         ) : (
-          requests.map((req) => (
+          filteredPending.map((req) => (
             <RequestCard key={req.id} request={req} />
           ))
         )}
       </div>
+
+      {(filteredCancelled.length > 0 || searchTerm) && (
+        <div className="mt-8 space-y-4">
+          <h3 className="text-lg font-medium text-destructive">Cancelled Requests</h3>
+          <p className="text-sm text-muted-foreground">
+            These requests were cancelled. You can revert them if this was a mistake.
+          </p>
+          {filteredCancelled.length === 0 ? (
+             <Card className="border-dashed bg-card/30">
+               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                 <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                   <Slash className="h-6 w-6 text-muted-foreground" />
+                 </div>
+                 <h3 className="text-lg font-medium">No cancelled requests</h3>
+                 <p className="text-sm text-muted-foreground max-w-sm mt-1">
+                   {searchTerm ? 'Try adjusting your search terms.' : ''}
+                 </p>
+               </CardContent>
+             </Card>
+          ) : (
+            filteredCancelled.map((req) => (
+              <RequestCard key={req.id} request={req} />
+            ))
+          )}
+        </div>
+      )}
     </div>
   )
 }

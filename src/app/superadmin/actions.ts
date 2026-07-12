@@ -333,22 +333,79 @@ export async function sendBroadcastMessage(formData: FormData) {
   const message = String(formData.get('message') ?? '').trim()
   const type = String(formData.get('type') ?? 'info')
 
+  let targetBranches: string[] = []
+  let targetPositions: string[] = []
+  try {
+    const b = formData.get('branches')
+    if (b) targetBranches = JSON.parse(String(b))
+    const p = formData.get('positions')
+    if (p) targetPositions = JSON.parse(String(p))
+  } catch {
+    // ignore
+  }
+
   if (!title || !message) {
     return { error: 'Title and message are required' }
   }
 
   const supabase = createAdminClient()
-  const { error } = await supabase
-    .from('notifications')
-    .insert({
-      profile_id: null,
-      title,
-      message,
-      type,
-    })
+  
+  const targetProfileIds = new Set<string>()
 
-  if (error) {
-    return { error: error.message }
+  if (targetBranches.length === 0 && targetPositions.length === 0) {
+    // Send to everyone
+    const { data: profiles, error: fetchError } = await supabase.from('profiles').select('id')
+    if (fetchError || !profiles || profiles.length === 0) {
+      return { error: 'Failed to fetch users or no users found' }
+    }
+    profiles.forEach(p => targetProfileIds.add(p.id))
+  } else {
+    // Filter by memberships
+    let query = supabase.from('memberships').select('profile_id').is('ended_at', null)
+    if (targetBranches.length > 0) {
+      query = query.in('branch_id', targetBranches)
+    }
+    if (targetPositions.length > 0) {
+      query = query.in('position_id', targetPositions)
+    }
+    
+    const { data: memberships, error } = await query
+    if (error || !memberships || memberships.length === 0) {
+      return { error: 'No active users match the selected filters.' }
+    }
+    memberships.forEach(m => targetProfileIds.add(m.profile_id))
+  }
+
+  const profileIdsArray = Array.from(targetProfileIds)
+
+  if (profileIdsArray.length === 0) {
+    return { error: 'No active users match the selected filters.' }
+  }
+
+  const target_filters = targetBranches.length === 0 && targetPositions.length === 0
+    ? null
+    : {
+        branches: targetBranches.length > 0 ? targetBranches : null,
+        positions: targetPositions.length > 0 ? targetPositions : null,
+      }
+
+  // Bulk insert notifications
+  const broadcast_id = crypto.randomUUID()
+  const notifications = profileIdsArray.map(id => ({
+    broadcast_id,
+    profile_id: id,
+    title,
+    message,
+    type,
+    is_read: false,
+    target_filters
+  }))
+
+  // Insert in chunks to avoid hitting payload limits if user count grows
+  for (let i = 0; i < notifications.length; i += 1000) {
+    const chunk = notifications.slice(i, i + 1000)
+    const { error } = await supabase.from('notifications').insert(chunk)
+    if (error) return { error: error.message }
   }
 
   await logAdminAction({
@@ -361,5 +418,48 @@ export async function sendBroadcastMessage(formData: FormData) {
     details: { type },
   })
 
+  return { success: true }
+}
+
+export async function editBroadcast(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+
+  const broadcast_id = String(formData.get('broadcast_id') ?? '').trim()
+  const title = String(formData.get('title') ?? '').trim()
+  const message = String(formData.get('message') ?? '').trim()
+  const type = String(formData.get('type') ?? 'info')
+
+  if (!broadcast_id || !title || !message) {
+    return { error: 'Missing required fields' }
+  }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('notifications')
+    .update({ title, message, type, is_edited: true })
+    .eq('broadcast_id', broadcast_id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/superadmin/notifications')
+  return { success: true }
+}
+
+export async function deleteBroadcast(broadcastId: string) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+
+  if (!broadcastId) return { error: 'Missing broadcast ID' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('broadcast_id', broadcastId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/superadmin/notifications')
   return { success: true }
 }

@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { signIn as nextAuthSignIn, signOut as nextAuthSignOut, auth } from '@/auth'
+import { AuthError } from 'next-auth'
 import bcrypt from 'bcrypt'
 import { createAdminClient } from '@/utils/supabase/server'
 
@@ -31,12 +32,11 @@ export async function signInWithEmail(formData: FormData) {
       password,
       redirectTo: '/',
     })
-  } catch (error: any) {
-    // NextAuth throws a NEXT_REDIRECT on success — re-throw it
-    if (error?.digest?.startsWith('NEXT_REDIRECT')) {
-      throw error
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { error: 'Invalid email or password.' }
     }
-    return { error: 'Invalid email or password.' }
+    throw error
   }
 }
 
@@ -61,11 +61,11 @@ export async function signInAsSuperadmin(formData: FormData) {
       isSuperAdminLogin: 'true',
       redirectTo: '/superadmin',
     })
-  } catch (error: any) {
-    if (error?.digest?.startsWith('NEXT_REDIRECT')) {
-      throw error
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { error: 'Invalid superadmin credentials.' }
     }
-    return { error: 'Invalid superadmin credentials.' }
+    throw error
   }
 }
 

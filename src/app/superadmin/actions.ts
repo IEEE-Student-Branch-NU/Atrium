@@ -322,3 +322,44 @@ export async function setPositionPermissions(formData: FormData) {
   revalidatePath('/superadmin/positions')
   return { success: true }
 }
+
+// -- Broadcast Notifications ----------------------------------
+
+export async function sendBroadcastMessage(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+
+  const title = String(formData.get('title') ?? '').trim()
+  const message = String(formData.get('message') ?? '').trim()
+  const type = String(formData.get('type') ?? 'info')
+
+  if (!title || !message) {
+    return { error: 'Title and message are required' }
+  }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      profile_id: null,
+      title,
+      message,
+      type,
+    })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  await logAdminAction({
+    actorProfileId: session.user!.id,
+    action: 'broadcast_sent',
+    entityType: 'user',
+    entityId: session.user!.id,
+    branchId: null,
+    summary: `Sent broadcast message: "${title}"`,
+    details: { type },
+  })
+
+  return { success: true }
+}

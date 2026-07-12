@@ -21,6 +21,7 @@ import {
   getRecentActivityFeed,
   type OrgNode,
 } from './queries'
+import { SendBroadcastDialog } from '@/components/superadmin/send-broadcast-dialog'
 
 // ── Helper: format time ago ──────────────────────────────────
 // Mirrors the formatter in src/app/(portal)/page.tsx.
@@ -110,11 +111,14 @@ export default async function SuperAdminDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Super Admin Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Organization-wide overview across every branch and member.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Super Admin Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Organization-wide overview across every branch and member.
+          </p>
+        </div>
+        <SendBroadcastDialog />
       </div>
 
       {/* Stat Grid */}

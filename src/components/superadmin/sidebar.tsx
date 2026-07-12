@@ -53,7 +53,6 @@ const NAV: NavItem[] = [
   { label: 'Position Requests', href: '/superadmin/position-requests', icon: Inbox },
   { label: 'Notifications', href: '/superadmin/notifications', icon: Bell },
   { label: 'Audit Logs', href: '/superadmin/audit', icon: ScrollText },
-  { label: 'Settings', href: '/superadmin/settings', icon: Settings },
   { label: 'Manage', href: '/superadmin/manage', icon: Shield },
 ]
 

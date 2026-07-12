@@ -22,6 +22,7 @@ import {
   type OrgNode,
 } from '@/app/superadmin/queries'
 import { SendBroadcastDialog } from '@/components/superadmin/send-broadcast-dialog'
+import { createAdminClient } from '@/utils/supabase/server'
 
 // ── Helper: format time ago ──────────────────────────────────
 // Mirrors the formatter in src/app/(portal)/page.tsx.

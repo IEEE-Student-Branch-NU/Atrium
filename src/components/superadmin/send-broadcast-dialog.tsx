@@ -29,7 +29,7 @@ import { sendBroadcastMessage } from '@/app/superadmin/actions'
 
 interface SendBroadcastDialogProps {
   branches?: { id: string; name: string }[]
-  positions?: { id: string; name: string }[]
+  positions?: { id: string; name: string; branch_id: string }[]
 }
 
 export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroadcastDialogProps) {
@@ -42,6 +42,10 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
   
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
   const [selectedPositions, setSelectedPositions] = useState<string[]>([])
+
+  const filteredPositions = selectedBranches.length > 0 
+    ? positions.filter(p => selectedBranches.includes(p.branch_id))
+    : positions
 
   function handleSubmit(formData: FormData) {
     setError(null)
@@ -70,6 +74,19 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
     setSelectedBranches(prev => 
       prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
     )
+    // Clear selected positions that no longer match the branch filters
+    setSelectedPositions(prev => {
+      const remainingBranchIds = selectedBranches.includes(id) 
+        ? selectedBranches.filter(b => b !== id) 
+        : [...selectedBranches, id]
+      
+      if (remainingBranchIds.length === 0) return prev // If no branches selected, all positions are valid
+
+      return prev.filter(posId => {
+        const pos = positions.find(p => p.id === posId)
+        return pos && remainingBranchIds.includes(pos.branch_id)
+      })
+    })
   }
 
   function togglePosition(id: string) {
@@ -86,7 +103,7 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
           Send Broadcast
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <form action={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Send Broadcast Notification</DialogTitle>
@@ -105,19 +122,20 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Target Branches</Label>
-                <div className="rounded-md border p-2 h-[120px]">
+                <Label>1. Target Branches</Label>
+                <div className="rounded-md border p-2 h-[160px]">
                   <ScrollArea className="h-full">
                     {branches.length === 0 && <span className="text-xs text-muted-foreground">No branches available</span>}
                     <div className="space-y-2 pr-4">
                       {branches.map(b => (
-                        <div key={b.id} className="flex items-center space-x-2">
+                        <div key={b.id} className="flex items-start space-x-2">
                           <Checkbox 
                             id={`branch-${b.id}`} 
                             checked={selectedBranches.includes(b.id)}
                             onCheckedChange={() => toggleBranch(b.id)}
+                            className="mt-0.5"
                           />
-                          <Label htmlFor={`branch-${b.id}`} className="text-sm font-normal cursor-pointer leading-none">
+                          <Label htmlFor={`branch-${b.id}`} className="text-sm font-normal cursor-pointer leading-tight">
                             {b.name}
                           </Label>
                         </div>
@@ -125,28 +143,40 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
                     </div>
                   </ScrollArea>
                 </div>
+                {selectedBranches.length > 0 && (
+                  <p className="text-xs text-muted-foreground text-right">{selectedBranches.length} selected</p>
+                )}
               </div>
+              
               <div className="space-y-2">
-                <Label>Target Positions</Label>
-                <div className="rounded-md border p-2 h-[120px]">
+                <Label>2. Target Positions {selectedBranches.length > 0 ? '(Filtered)' : '(All Branches)'}</Label>
+                <div className="rounded-md border p-2 h-[160px]">
                   <ScrollArea className="h-full">
-                    {positions.length === 0 && <span className="text-xs text-muted-foreground">No positions available</span>}
+                    {filteredPositions.length === 0 && <span className="text-xs text-muted-foreground">No positions available</span>}
                     <div className="space-y-2 pr-4">
-                      {positions.map(p => (
-                        <div key={p.id} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`pos-${p.id}`} 
-                            checked={selectedPositions.includes(p.id)}
-                            onCheckedChange={() => togglePosition(p.id)}
-                          />
-                          <Label htmlFor={`pos-${p.id}`} className="text-sm font-normal cursor-pointer leading-none">
-                            {p.name}
-                          </Label>
-                        </div>
-                      ))}
+                      {filteredPositions.map(p => {
+                        const branchName = branches.find(b => b.id === p.branch_id)?.name || 'Unknown Branch'
+                        return (
+                          <div key={p.id} className="flex items-start space-x-2">
+                            <Checkbox 
+                              id={`pos-${p.id}`} 
+                              checked={selectedPositions.includes(p.id)}
+                              onCheckedChange={() => togglePosition(p.id)}
+                              className="mt-0.5"
+                            />
+                            <Label htmlFor={`pos-${p.id}`} className="text-sm font-normal cursor-pointer leading-tight flex flex-col">
+                              <span>{p.name}</span>
+                              <span className="text-[10px] text-muted-foreground">{branchName}</span>
+                            </Label>
+                          </div>
+                        )
+                      })}
                     </div>
                   </ScrollArea>
                 </div>
+                {selectedPositions.length > 0 && (
+                  <p className="text-xs text-muted-foreground text-right">{selectedPositions.length} selected</p>
+                )}
               </div>
             </div>
 

@@ -362,6 +362,11 @@ export async function getPendingPositionRequests(): Promise<PositionRequest[]> {
     decided_by_name: (r.decided_by as any)?.full_name ?? null,
     decided_at: r.decided_at,
     created_at: r.created_at,
+    profile_bio: (r.profiles as any)?.bio ?? null,
+    profile_skills: (r.profiles as any)?.skills ?? null,
+    profile_phone: (r.profiles as any)?.phone ?? null,
+    profile_section: (r.profiles as any)?.section ?? null,
+    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
   }))
 }
 
@@ -398,6 +403,11 @@ export async function getCancelledPositionRequests(): Promise<PositionRequest[]>
     decided_by_name: (r.decided_by as any)?.full_name ?? null,
     decided_at: r.decided_at,
     created_at: r.created_at,
+    profile_bio: (r.profiles as any)?.bio ?? null,
+    profile_skills: (r.profiles as any)?.skills ?? null,
+    profile_phone: (r.profiles as any)?.phone ?? null,
+    profile_section: (r.profiles as any)?.section ?? null,
+    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
   }))
 }
 
@@ -435,6 +445,11 @@ export async function getDecidedPositionRequests(): Promise<PositionRequest[]> {
     decided_by_name: (r.decided_by as any)?.full_name ?? null,
     decided_at: r.decided_at,
     created_at: r.created_at,
+    profile_bio: (r.profiles as any)?.bio ?? null,
+    profile_skills: (r.profiles as any)?.skills ?? null,
+    profile_phone: (r.profiles as any)?.phone ?? null,
+    profile_section: (r.profiles as any)?.section ?? null,
+    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
   }))
 }
 
@@ -471,6 +486,11 @@ export async function getUserPositionRequests(profileId: string): Promise<Positi
     decided_by_name: (r.decided_by as any)?.full_name ?? null,
     decided_at: r.decided_at,
     created_at: r.created_at,
+    profile_bio: (r.profiles as any)?.bio ?? null,
+    profile_skills: (r.profiles as any)?.skills ?? null,
+    profile_phone: (r.profiles as any)?.phone ?? null,
+    profile_section: (r.profiles as any)?.section ?? null,
+    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
   }))
 }
 

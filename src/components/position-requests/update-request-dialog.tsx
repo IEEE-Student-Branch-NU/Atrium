@@ -79,7 +79,7 @@ export function UpdateRequestDialog({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select value={status} onValueChange={(v) => v && setStatus(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

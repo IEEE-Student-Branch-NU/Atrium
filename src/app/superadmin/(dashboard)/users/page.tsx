@@ -164,10 +164,8 @@ export default async function UsersPage({
                         <Badge variant={statusVariant(u.status)}>{u.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/superadmin/users/${u.id}`}>
-                            Manage
-                          </Link>
+                        <Button variant="outline" size="sm" render={<Link href={`/superadmin/users/${u.id}`} />}>
+                          Manage
                         </Button>
                       </TableCell>
                     </TableRow>

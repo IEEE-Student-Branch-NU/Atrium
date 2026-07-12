@@ -104,11 +104,9 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Megaphone className="mr-2 h-4 w-4" />
-          Send Broadcast
-        </Button>
+      <DialogTrigger render={<Button />}>
+        <Megaphone className="mr-2 h-4 w-4" />
+        Send Broadcast
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px]">
         <form action={handleSubmit}>
@@ -187,7 +185,7 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
 
             <div className="space-y-2">
               <Label htmlFor="type">Notification Type</Label>
-              <Select value={type} onValueChange={setType}>
+              <Select value={type} onValueChange={(v) => v && setType(v)}>
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>

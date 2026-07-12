@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Inbox, Check, X, Clock, Mail, Briefcase, Building2, Search, UserPlus } from 'lucide-react'
+import { Inbox, Check, X, Clock, Mail, Briefcase, Building2, Search, UserPlus, Slash } from 'lucide-react'
 import Link from 'next/link'
 import {
   Card,
@@ -86,11 +86,9 @@ export function SuperAdminPositionRequestsClient({ pending, history, cancelled }
             />
           </div>
           
-          <Button variant="outline" className="w-full sm:w-auto" asChild>
-            <Link href="/superadmin/users" className="inline-flex items-center justify-center whitespace-nowrap">
-              <UserPlus className="mr-2 h-4 w-4" />
-              Direct Assign User
-            </Link>
+          <Button variant="outline" className="w-full sm:w-auto" render={<Link href="/superadmin/users" className="inline-flex items-center justify-center whitespace-nowrap" />}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Direct Assign User
           </Button>
         </div>
       </div>

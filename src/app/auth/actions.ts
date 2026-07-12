@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { signIn as nextAuthSignIn, signOut as nextAuthSignOut, auth } from '@/auth'
 import bcrypt from 'bcrypt'
 import { createAdminClient } from '@/utils/supabase/server'
+import { notifyUser } from '@/lib/notifications'
 
 /**
  * Sign in with Google OAuth.
@@ -166,6 +167,9 @@ export async function signUp(formData: FormData) {
   // ── Create initial membership ───────────────────────────
   await assignMembership(supabase, profileData.id, branchSlug, roleName)
 
+  // ── Welcome the new member (in-app + email) ─────────────
+  await notifyUser({ profileId: profileData.id, event: 'welcome', params: { name: fullName } })
+
   // ── Auto sign-in after successful signup ────────────────
   try {
     await nextAuthSignIn('credentials', {
@@ -242,6 +246,13 @@ export async function completeRegistration(formData: FormData) {
 
   // ── Create initial membership ───────────────────────────
   await assignMembership(supabase, session.user.id, branchSlug, roleName)
+
+  // ── Welcome the new member (in-app + email) ─────────────
+  await notifyUser({
+    profileId: session.user.id,
+    event: 'welcome',
+    params: { name: session.user.name ?? null },
+  })
 
   if (newStatus === 'approved') {
     redirect('/')

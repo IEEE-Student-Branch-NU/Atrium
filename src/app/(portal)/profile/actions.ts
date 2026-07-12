@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
+import { notifyBranch } from '@/lib/notifications'
 import bcrypt from 'bcrypt'
 
 /**
@@ -199,6 +200,23 @@ export async function requestPosition(formData: FormData) {
     console.error('Position request error:', error)
     return { error: 'Failed to submit request. Please try again.' }
   }
+
+  // Alert the branch's Chair(s) that a new request needs review.
+  const [{ data: requester }, { data: position }, { data: branch }] = await Promise.all([
+    supabase.from('profiles').select('full_name').eq('id', session.user.id).single(),
+    supabase.from('positions').select('name').eq('id', positionId).single(),
+    supabase.from('branches').select('name').eq('id', branchId).single(),
+  ])
+  await notifyBranch({
+    branchId,
+    event: 'position_request.submitted',
+    params: {
+      name: requester?.full_name ?? null,
+      position: position?.name ?? null,
+      branch: branch?.name ?? null,
+    },
+    actorProfileId: session.user.id,
+  })
 
   revalidatePath('/profile')
   return { success: true }

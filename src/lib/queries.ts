@@ -271,37 +271,66 @@ export interface Notification {
   message: string
   link: string | null
   is_read: boolean
-  type: 'normal' | 'broadcast' | 'warning' | 'success' | 'error'
+  // `type` = visual severity; `broadcast` retained for legacy rows not yet backfilled.
+  type: 'normal' | 'info' | 'success' | 'warning' | 'error' | 'broadcast'
+  audience: 'user' | 'branch' | 'broadcast'
+  branch_id: string | null
+  event_key: string | null
   created_at: string
 }
 
+// Shared column list — keeps every notification read in sync with the interface.
+const NOTIFICATION_COLUMNS = 'id, title, message, link, is_read, type, audience, branch_id, event_key, created_at'
+
+/**
+ * Personal unread notifications (drives the top-bar badge). Personal only —
+ * broadcasts are single shared rows with no per-user read state, so counting
+ * them would leave the badge permanently lit.
+ */
 export async function getUnreadNotifications(profileId: string): Promise<Notification[]> {
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, title, message, link, is_read, type, created_at')
+    .select(NOTIFICATION_COLUMNS)
     .eq('profile_id', profileId)
     .eq('is_read', false)
     .order('created_at', { ascending: false })
     .limit(20)
 
   if (error) console.error('Error fetching unread notifications:', error)
-  return data ?? []
+  return (data ?? []) as unknown as Notification[]
 }
 
+/** The member's notification list: their personal rows plus org-wide broadcasts. */
 export async function getNotifications(profileId: string, limit = 50): Promise<Notification[]> {
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, title, message, link, is_read, type, created_at')
-    .eq('profile_id', profileId)
+    .select(NOTIFICATION_COLUMNS)
+    .or(`profile_id.eq.${profileId},audience.eq.broadcast`)
     .order('created_at', { ascending: false })
     .limit(limit)
 
   if (error) console.error('Error fetching notifications:', error)
-  return data ?? []
+  return (data ?? []) as unknown as Notification[]
+}
+
+/** Branch-activity feed for a Chair: notifications routed to a branch. */
+export async function getBranchNotifications(branchId: string, limit = 50): Promise<Notification[]> {
+  const supabase = createAdminClient()
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .select(NOTIFICATION_COLUMNS)
+    .eq('audience', 'branch')
+    .eq('branch_id', branchId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) console.error('Error fetching branch notifications:', error)
+  return (data ?? []) as unknown as Notification[]
 }
 
 // ── Position Requests ────────────────────────────────────────

@@ -10,6 +10,7 @@ import {
   Users,
   BadgeCheck,
   Inbox,
+  Bell,
   ScrollText,
   Settings,
   ChevronLeft,
@@ -49,6 +50,7 @@ const NAV: NavItem[] = [
   { label: 'Users', href: '/superadmin/users', icon: Users },
   { label: 'Positions', href: '/superadmin/positions', icon: BadgeCheck },
   { label: 'Position Requests', href: '/superadmin/position-requests', icon: Inbox },
+  { label: 'Notifications', href: '/superadmin/notifications', icon: Bell },
   { label: 'Audit Logs', href: '/superadmin/audit', icon: ScrollText },
   { label: 'Settings', href: '/superadmin/settings', icon: Settings },
 ]

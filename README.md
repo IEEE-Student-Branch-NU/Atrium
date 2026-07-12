@@ -166,6 +166,12 @@ AUTH_GOOGLE_SECRET=GOCSPX-your-google-client-secret
 
 # ── Password Hashing ─────────────────────────────
 BCRYPT_SALT_ROUNDS=12
+
+# ── Email (Resend) — optional ─────────────────────
+# Powers email delivery for high-signal notifications (welcome, approvals,
+# promotions). If unset, the app runs normally and email sends are a no-op.
+RESEND_API_KEY=re_your_resend_api_key
+EMAIL_FROM=Atrium <no-reply@your-verified-domain>
 ```
 
 > **Google OAuth Setup:** In the Google Cloud Console, add `http://localhost:3000` to **Authorized JavaScript Origins** and `http://localhost:3000/api/auth/callback/google` to **Authorized Redirect URIs**. See [AUTH.md](docs/AUTH.md) for details.
@@ -182,6 +188,9 @@ Run the migrations **in order** in your Supabase SQL editor:
 6. `supabase/migrations/00006_workspace_and_requests.sql` — position_requests, notifications tables
 7. `supabase/migrations/00007_notification_types.sql` — notifications.type column
 8. `supabase/migrations/00008_audit_log.sql` — Unified `audit_log` table for the SuperAdmin portal (required for `/superadmin/audit` to show data)
+9. `supabase/migrations/00009_broadcast_notifications.sql` — Broadcast notifications + realtime publication + RLS
+10. `supabase/migrations/00010_hardcoded_superadmin_profile.sql` — Seeds the fixed super-admin profile row
+11. `supabase/migrations/00011_notification_routing.sql` — Notification routing: `audience`/`branch_id`/`event_key`/`actor_profile_id`, Chair-scoped RLS (required for the notification system)
 
 ### 5. Start Development Server
 

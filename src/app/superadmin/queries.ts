@@ -243,6 +243,114 @@ export async function getAllPermissions(): Promise<PermissionRow[]> {
   return data ?? []
 }
 
+// ── Notifications (oversight feed + send-dialog data) ────────
+// Reads the routing columns added in migration 00011. That migration may
+// not be applied yet, so every read degrades to empty rather than throwing
+// (mirrors getAuditLog).
+
+export type AdminNotificationRow = {
+  id: string
+  audience: string
+  type: string
+  event_key: string | null
+  title: string
+  message: string
+  is_read: boolean
+  created_at: string
+  recipient_name: string | null
+  branch_name: string | null
+  actor_name: string | null
+}
+
+export async function getAllNotifications(opts: {
+  audience?: string
+  type?: string
+  branchId?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<{ rows: AdminNotificationRow[]; total: number }> {
+  const supabase = createAdminClient()
+  const page = opts.page ?? 1
+  const pageSize = opts.pageSize ?? 50
+  const from = (page - 1) * pageSize
+
+  try {
+    let q = supabase
+      .from('notifications')
+      .select(
+        `id, audience, type, event_key, title, message, is_read, created_at,
+         recipient:profiles!notifications_profile_id_fkey(full_name),
+         actor:profiles!notifications_actor_profile_id_fkey(full_name),
+         branches(name)`,
+        { count: 'exact' },
+      )
+      .order('created_at', { ascending: false })
+
+    if (opts.audience) q = q.eq('audience', opts.audience)
+    if (opts.type) q = q.eq('type', opts.type)
+    if (opts.branchId) q = q.eq('branch_id', opts.branchId)
+    if (opts.search) {
+      const term = sanitizeSearchTerm(opts.search)
+      if (term) {
+        const s = `%${term}%`
+        q = q.or(`title.ilike.${s},message.ilike.${s}`)
+      }
+    }
+
+    const { data, count, error } = await q.range(from, from + pageSize - 1)
+    if (error) {
+      console.error('getAllNotifications failed', error)
+      return { rows: [], total: 0 }
+    }
+
+    const rows: AdminNotificationRow[] = (data ?? []).map((r) => {
+      const row = r as unknown as {
+        id: string; audience: string; type: string; event_key: string | null
+        title: string; message: string; is_read: boolean; created_at: string
+        recipient: { full_name: string | null } | null
+        actor: { full_name: string | null } | null
+        branches: { name: string } | null
+      }
+      return {
+        id: row.id,
+        audience: row.audience,
+        type: row.type,
+        event_key: row.event_key,
+        title: row.title,
+        message: row.message,
+        is_read: row.is_read,
+        created_at: row.created_at,
+        recipient_name: row.recipient?.full_name ?? null,
+        branch_name: row.branches?.name ?? null,
+        actor_name: row.actor?.full_name ?? null,
+      }
+    })
+    return { rows, total: count ?? 0 }
+  } catch (e) {
+    console.error('getAllNotifications failed', e)
+    return { rows: [], total: 0 }
+  }
+}
+
+/** Branches for the send-dialog / feed filter. */
+export async function getBranchOptions(): Promise<{ id: string; name: string }[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase.from('branches').select('id, name').order('name')
+  return data ?? []
+}
+
+/** Basic user list for the targeted-send picker (capped). */
+export async function getRecipientOptions(limit = 500): Promise<{ id: string; full_name: string | null; email: string }[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .order('full_name')
+    .limit(limit)
+  return (data ?? []) as { id: string; full_name: string | null; email: string }[]
+}
+
 // ── Positions ────────────────────────────────────────────────
 
 export type PositionGroup = {

@@ -102,7 +102,7 @@ export default async function SuperAdminDashboardPage() {
       href: '/superadmin/positions',
     },
     {
-      label: 'Pending Position Requests',
+      label: 'Pending Requests',
       value: stats.pendingPositionRequests,
       icon: Inbox,
       href: '/superadmin/position-requests',
@@ -122,9 +122,9 @@ export default async function SuperAdminDashboardPage() {
       {/* Stat Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {statCards.map((card) => (
-          <Link key={card.label} href={card.href}>
-            <Card className="border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-primary/30 hover:shadow-md cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Link key={card.label} href={card.href} className="block h-full">
+            <Card className="h-full flex flex-col justify-between border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-primary/30 hover:shadow-md cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <CardTitle className="text-xs font-medium text-muted-foreground">
                   {card.label}
                 </CardTitle>
@@ -137,19 +137,17 @@ export default async function SuperAdminDashboardPage() {
           </Link>
         ))}
 
-        {/* Recent Activity — a nav card, not a stat. `activity.length` saturates
-            at the `getRecentActivityFeed(8)` limit, so it isn't a real total;
-            link out to the full audit log instead of showing a misleading number. */}
-        <Link href="/superadmin/audit">
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-primary/30 hover:shadow-md cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+        {/* Recent Activity */}
+        <Link href="/superadmin/audit" className="block h-full">
+          <Card className="h-full flex flex-col justify-between border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-primary/30 hover:shadow-md cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-xs font-medium text-muted-foreground">
                 Recent Activity
               </CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground/60" />
             </CardHeader>
             <CardContent>
-              <div className="text-sm font-medium text-primary">View audit log &rarr;</div>
+              <div className="text-sm font-medium text-primary flex items-center h-8">View audit log &rarr;</div>
             </CardContent>
           </Card>
         </Link>

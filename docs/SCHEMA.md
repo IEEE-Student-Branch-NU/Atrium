@@ -228,6 +228,17 @@ erDiagram
         TIMESTAMPTZ created_at
     }
 
+    notifications {
+        UUID id PK
+        UUID profile_id FK "→ profiles, nullable for broadcast"
+        TEXT title
+        TEXT message
+        TEXT link
+        BOOLEAN is_read
+        TIMESTAMPTZ created_at
+        TEXT type "normal, broadcast, success, warning, error"
+    }
+
     profiles ||--o{ memberships : "profile_id"
     profiles ||--o{ member_permissions : "profile_id"
     profiles ||--o{ events : "creator_id"
@@ -235,6 +246,7 @@ erDiagram
     profiles ||--o{ event_audit_log : "changed_by"
     profiles ||--o{ membership_audit_log : "changed_by"
     profiles ||--o{ audit_log : "actor_profile_id"
+    profiles ||--o{ notifications : "profile_id"
 
     branches ||--o| branches : "parent_id"
     branches ||--o{ positions : "branch_id"
@@ -479,6 +491,29 @@ Immutable log of all membership/role/position changes.
 
 **RLS:** Enabled with **no public policies** — only the service-role client (`createAdminClient()`) can read or write this table, consistent with `superadmins`.
 
+---
+
+### 4.15 `notifications`
+Added in migration `00006_workspace_and_requests.sql`, modified in `00007_notification_types.sql` and `00009_broadcast_notifications.sql`. Stores in-app user notifications. Broadcast notifications have a NULL `profile_id` and are intended for all users. RLS allows users to read their own notifications or broadcast notifications. Included in the `supabase_realtime` publication for WebSocket streaming.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK, DEFAULT `gen_random_uuid()` | |
+| `profile_id` | UUID | FK → `profiles`, ON DELETE CASCADE | Nullable (for broadcasts) |
+| `title` | TEXT | NOT NULL | |
+| `message` | TEXT | NOT NULL | |
+| `link` | TEXT | | Optional URL |
+| `is_read` | BOOLEAN | NOT NULL, DEFAULT `false` | |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT `now()` | |
+| `type` | TEXT | NOT NULL, DEFAULT `'normal'` | `normal`, `broadcast`, `success`, `warning`, `error` |
+
+**Constraints:**
+- `notifications_recipient_check`: CHECK `(type = 'broadcast' AND profile_id IS NULL) OR (type != 'broadcast' AND profile_id IS NOT NULL)`
+
+**RLS:** Enabled. SELECT policy allows users to read rows where `auth.uid()::text = profile_id::text OR type = 'broadcast'`.
+
+---
+
 **Known follow-up:** The SuperAdmin Audit page currently reads only from `audit_log` (Phase-1 scope). Merging the legacy `event_audit_log` and `membership_audit_log` feeds into the same view is a flagged, not-yet-implemented extension (the `source` parameter in `getAuditLog()` is already wired for it).
 
 ---
@@ -677,3 +712,4 @@ WHERE ieee_membership_id = $1;
 | `00006_workspace_and_requests.sql` | Position requests + notifications | Added `profiles.bio`/`profiles.skills`. Added `position_request_status` enum and `position_requests` table (member-initiated requests to hold a position). Added `notifications` table. |
 | `00007_notification_types.sql` | Notification categorization | Added `notifications.type` column (`normal`, `broadcast`, `success`, `warning`, `error`). |
 | `00008_audit_log.sql` | Unified SuperAdmin audit trail | Added `audit_log` table (documented in §4.14) with indexes on `created_at`, `actor_profile_id`, and `(entity_type, entity_id)`. RLS enabled with no public policies (service-role only). Records structural/super-admin actions taken via the SuperAdmin portal. |
+| `00009_broadcast_notifications.sql` | Broadcast notifications | Made `notifications.profile_id` nullable, added CHECK constraint `notifications_recipient_check`, enabled RLS with SELECT policy, and added `notifications` table to `supabase_realtime` publication. |

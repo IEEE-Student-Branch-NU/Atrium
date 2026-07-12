@@ -8,6 +8,8 @@ import { Sidebar } from '@/components/portal/sidebar'
 import { TopBar } from '@/components/portal/top-bar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ImpersonationBanner } from '@/components/superadmin/impersonation-banner'
+import { createSupabaseToken } from '@/utils/supabase/token'
+import { RealtimeNotificationsProvider } from '@/components/providers/realtime-notifications-provider'
 
 export default async function PortalLayout({
   children,
@@ -52,6 +54,9 @@ export default async function PortalLayout({
   // Fetch unread notifications count
   const unreadNotifications = await getUnreadNotifications(actor.actingProfileId!)
 
+  // Mint a custom Supabase JWT for the client to use with Realtime
+  const supabaseToken = await createSupabaseToken(actor.actingProfileId!)
+
   const userInfo = {
     name: profile.full_name,
     email: profile.email,
@@ -62,24 +67,29 @@ export default async function PortalLayout({
 
   return (
     <TooltipProvider delay={0}>
-      <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar
-          user={userInfo}
-          permissions={permissions}
-          memberships={memberships}
-          activeMembershipId={profile.membership_id}
-        />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {actor.isImpersonating && <ImpersonationBanner name={profile.full_name ?? 'this member'} />}
-          <TopBar
+      <RealtimeNotificationsProvider 
+        profileId={actor.actingProfileId!} 
+        supabaseToken={supabaseToken}
+      >
+        <div className="flex h-screen overflow-hidden bg-background">
+          <Sidebar
             user={userInfo}
-            unreadCount={unreadNotifications.length}
+            permissions={permissions}
+            memberships={memberships}
+            activeMembershipId={profile.membership_id}
           />
-          <main className="flex-1 overflow-y-auto p-6">
-            {children}
-          </main>
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {actor.isImpersonating && <ImpersonationBanner name={profile.full_name ?? 'this member'} />}
+            <TopBar
+              user={userInfo}
+              unreadCount={unreadNotifications.length}
+            />
+            <main className="flex-1 overflow-y-auto p-6">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
+      </RealtimeNotificationsProvider>
     </TooltipProvider>
   )
 }

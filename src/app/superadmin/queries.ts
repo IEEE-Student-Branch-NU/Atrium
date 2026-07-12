@@ -384,3 +384,17 @@ export async function getAuditLog(opts: {
     return { rows: [], total: 0 }
   }
 }
+
+// ── Notifications ──────────────────────────────────────────────
+
+export async function getAllNotifications(limit = 100) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, title, message, type, is_read, created_at, profile_id, profiles(full_name, email)')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) console.error('Error fetching all notifications:', error)
+  return data ?? []
+}

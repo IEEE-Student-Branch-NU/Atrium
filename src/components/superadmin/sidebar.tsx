@@ -17,6 +17,7 @@ import {
   Menu,
   LogOut,
   Shield,
+  Bell,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -50,6 +51,7 @@ const NAV: NavItem[] = [
   { label: 'Users', href: '/superadmin/users', icon: Users },
   { label: 'Positions', href: '/superadmin/positions', icon: BadgeCheck },
   { label: 'Position Requests', href: '/superadmin/position-requests', icon: Inbox },
+  { label: 'Notifications', href: '/superadmin/notifications', icon: Bell },
   { label: 'Audit Logs', href: '/superadmin/audit', icon: ScrollText },
   { label: 'Settings', href: '/superadmin/settings', icon: Settings },
   { label: 'Manage', href: '/superadmin/manage', icon: Shield },

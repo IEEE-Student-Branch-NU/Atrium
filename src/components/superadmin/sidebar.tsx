@@ -81,29 +81,49 @@ function getInitials(name: string | null | undefined): string {
 function SidebarContent({
   user,
   collapsed,
+  onToggleCollapse,
 }: {
   user: SuperAdminUser
   collapsed: boolean
+  onToggleCollapse?: () => void
 }) {
   const pathname = usePathname()
 
   return (
     <div className="flex h-full flex-col">
       {/* Branding */}
-      <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-4">
+      <div 
+        className={`flex h-16 items-center gap-3 border-b border-sidebar-border px-4 ${onToggleCollapse ? 'cursor-pointer hover:bg-sidebar-accent/50 transition-colors' : ''}`}
+        onClick={onToggleCollapse}
+      >
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
           <Landmark className="h-5 w-5" />
         </div>
         {!collapsed && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold text-sidebar-foreground">Atrium</span>
-            <Badge
-              variant="destructive"
-              className="h-4 w-fit px-1.5 text-[9px] font-semibold tracking-wide"
-            >
-              SUPER ADMIN
-            </Badge>
-          </div>
+          <>
+            <div className="flex flex-1 flex-col gap-0.5">
+              <span className="text-sm font-semibold text-sidebar-foreground">Atrium</span>
+              <Badge
+                variant="destructive"
+                className="h-4 w-fit px-1.5 text-[9px] font-semibold tracking-wide"
+              >
+                SUPER ADMIN
+              </Badge>
+            </div>
+            {onToggleCollapse && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleCollapse();
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
+          </>
         )}
       </div>
 
@@ -122,7 +142,7 @@ function SidebarContent({
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
                   : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              } ${collapsed ? 'justify-center px-2' : ''}`
+              }`
 
               const iconEl = (
                 <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-sidebar-primary' : ''}`} />
@@ -157,8 +177,8 @@ function SidebarContent({
       </ScrollArea>
 
       {/* User Card */}
-      <div className="border-t border-sidebar-border p-3">
-        <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
+      <div className="border-t border-sidebar-border px-4 py-3">
+        <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarImage src={user.image ?? undefined} alt={user.name ?? ''} />
             <AvatarFallback className="bg-sidebar-accent text-xs font-medium">
@@ -166,33 +186,33 @@ function SidebarContent({
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-medium text-sidebar-foreground">
-                {user.name ?? 'Super Admin'}
-              </span>
-              <span className="truncate text-[10px] text-sidebar-foreground/50">
-                {user.email}
-              </span>
-            </div>
-          )}
-          {!collapsed && (
-            <form action={signOut}>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-sidebar-foreground/50 hover:text-sidebar-foreground"
-                    />
-                  }
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </TooltipTrigger>
-                <TooltipContent side="right">Sign out</TooltipContent>
-              </Tooltip>
-            </form>
+            <>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm font-medium text-sidebar-foreground">
+                  {user.name ?? 'Super Admin'}
+                </span>
+                <span className="truncate text-[10px] text-sidebar-foreground/50">
+                  {user.email}
+                </span>
+              </div>
+              <form action={signOut}>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        type="submit"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                      />
+                    }
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Sign out</TooltipContent>
+                </Tooltip>
+              </form>
+            </>
           )}
         </div>
       </div>
@@ -213,23 +233,11 @@ export function SuperAdminSidebar({ user }: SuperAdminSidebarProps) {
           collapsed ? 'w-[68px]' : 'w-64'
         }`}
       >
-        <SidebarContent user={user} collapsed={collapsed} />
-
-        {/* Collapse Toggle */}
-        <div className="border-t border-sidebar-border p-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className="mx-auto flex h-7 w-7 text-sidebar-foreground/50 hover:text-sidebar-foreground"
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+        <SidebarContent 
+          user={user} 
+          collapsed={collapsed} 
+          onToggleCollapse={() => setCollapsed(!collapsed)} 
+        />
       </aside>
 
       {/* Mobile Sidebar (Sheet) */}

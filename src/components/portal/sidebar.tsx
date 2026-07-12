@@ -261,21 +261,40 @@ function SidebarContent({
   memberships,
   activeMembershipId,
   collapsed,
-}: SidebarProps & { collapsed: boolean }) {
+  onToggleCollapse,
+}: SidebarProps & { collapsed: boolean; onToggleCollapse?: () => void }) {
   const pathname = usePathname()
 
   return (
     <div className="flex h-full flex-col">
       {/* Branding */}
-      <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-4">
+      <div 
+        className={`flex h-16 items-center gap-3 border-b border-sidebar-border px-4 ${onToggleCollapse ? 'cursor-pointer hover:bg-sidebar-accent/50 transition-colors' : ''}`}
+        onClick={onToggleCollapse}
+      >
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
           <Landmark className="h-5 w-5" />
         </div>
         {!collapsed && (
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">Atrium</span>
-            <span className="text-[10px] text-sidebar-foreground/60">IEEE SBNU Portal</span>
-          </div>
+          <>
+            <div className="flex flex-1 flex-col">
+              <span className="text-sm font-semibold text-sidebar-foreground">Atrium</span>
+              <span className="text-[10px] text-sidebar-foreground/60">IEEE SBNU Portal</span>
+            </div>
+            {onToggleCollapse && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleCollapse();
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
+          </>
         )}
       </div>
 
@@ -317,7 +336,7 @@ function SidebarContent({
                           isActive
                             ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
                             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-                        } ${collapsed ? 'justify-center px-2' : ''}`}
+                        }`}
                       >
                         <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-sidebar-primary' : ''}`} />
                         {!collapsed && <span>{item.label}</span>}
@@ -347,8 +366,8 @@ function SidebarContent({
       </ScrollArea>
 
       {/* User Card */}
-      <div className="border-t border-sidebar-border p-3">
-        <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
+      <div className="border-t border-sidebar-border px-4 py-3">
+        <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />
             <AvatarFallback className="bg-sidebar-accent text-xs font-medium">
@@ -416,23 +435,8 @@ export function Sidebar({ user, permissions, memberships, activeMembershipId }: 
           memberships={memberships}
           activeMembershipId={activeMembershipId}
           collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed(!collapsed)}
         />
-
-        {/* Collapse Toggle */}
-        <div className="border-t border-sidebar-border p-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className="mx-auto flex h-7 w-7 text-sidebar-foreground/50 hover:text-sidebar-foreground"
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
       </aside>
 
       {/* Mobile Sidebar (Sheet) */}

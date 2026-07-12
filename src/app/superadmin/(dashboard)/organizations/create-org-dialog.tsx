@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { createOrganization, createSubBranch, updateBranch } from '../actions'
+import { createOrganization, createSubBranch, updateBranch } from '@/app/superadmin/actions'
 
 type ActionResult = { success?: boolean; error?: string }
 

@@ -25,9 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createPosition, updatePosition, deletePosition, setPositionPermissions } from '../actions'
+import { createPosition, updatePosition, deletePosition, setPositionPermissions } from '@/app/superadmin/actions'
 import type { BranchOption } from '@/lib/queries'
-import type { PermissionRow } from '../queries'
+import type { PermissionRow } from '@/app/superadmin/queries'
 
 type ActionResult = { success?: boolean; error?: string }
 

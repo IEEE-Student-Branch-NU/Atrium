@@ -19,14 +19,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        isSuperAdminLogin: { label: 'isSuperAdminLogin', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
         const email = credentials.email as string
         const password = credentials.password as string
+        const isSuperAdminLogin = credentials.isSuperAdminLogin === 'true'
 
-        // Validate domain
+        // Validate domain (superadmins should also be from nirmauni, but allow exception if needed. Currently required for all.)
         if (!email.endsWith('@nirmauni.ac.in')) return null
 
         const supabase = createAdminClient()
@@ -41,16 +43,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         let isValid = false
 
-        // 1. Check normal password hash if it exists
-        if (profile.password_hash) {
-          isValid = await bcrypt.compare(password, profile.password_hash)
-        }
-
-        // 2. If normal password failed (or doesn't exist), check superadmin passphrase
-        if (!isValid) {
+        if (isSuperAdminLogin) {
+          // STRICT SUPERADMIN LOGIN: Only check superadmins table
           const { data: superadmins } = await supabase.from('superadmins').select('hashed_email, passphrase_hash')
           if (superadmins && superadmins.length > 0) {
-            // First, find if this email is a superadmin
             let superadminRow = null
             for (const row of superadmins) {
               if (await bcrypt.compare(email, row.hashed_email)) {
@@ -59,10 +55,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               }
             }
 
-            // If they are a superadmin, check if the password matches the superadmin passphrase
             if (superadminRow) {
               isValid = await bcrypt.compare(password, superadminRow.passphrase_hash)
             }
+          }
+        } else {
+          // STRICT NORMAL LOGIN: Only check profiles table
+          if (profile.password_hash) {
+            isValid = await bcrypt.compare(password, profile.password_hash)
           }
         }
 
@@ -73,7 +73,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: profile.email,
           name: profile.full_name,
           image: profile.avatar_url,
-        }
+          isSuperAdminLogin: isSuperAdminLogin,
+        } as any
       },
     }),
   ],
@@ -90,7 +91,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       const { user } = params
       if (user) {
-        token.isSuperAdmin = await isSuperAdmin(user.email ?? token.email ?? null)
+        token.isSuperAdmin = (user as any).isSuperAdminLogin === true
       }
 
       return token

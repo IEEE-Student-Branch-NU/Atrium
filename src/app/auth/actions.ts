@@ -41,20 +41,22 @@ export async function signInWithEmail(formData: FormData) {
 }
 
 /**
- * Sign in with email and password as Superadmin.
- * Passes the isSuperAdminLogin flag to Credentials provider.
+ * Sign in as Superadmin with a fixed username + password.
+ * The username is passed through NextAuth's Credentials provider in the
+ * `email` field (the provider's field name); `src/auth.ts` matches it against
+ * the hardcoded super-admin credentials — no email / Google account involved.
  */
 export async function signInAsSuperadmin(formData: FormData) {
-  const email = formData.get('email') as string
+  const username = formData.get('username') as string
   const password = formData.get('password') as string
 
-  if (!email || !password) {
-    return { error: 'Email and password are required.' }
+  if (!username || !password) {
+    return { error: 'Username and password are required.' }
   }
 
   try {
     await nextAuthSignIn('credentials', {
-      email,
+      email: username,
       password,
       isSuperAdminLogin: 'true',
       redirectTo: '/superadmin',

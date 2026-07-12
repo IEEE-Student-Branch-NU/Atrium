@@ -217,3 +217,117 @@ export async function rejectPositionRequest(requestId: string, reason: string) {
   revalidatePath('/profile')
   return { success: true }
 }
+
+export async function updatePositionRequestStatus(requestId: string, newStatus: string, adminComment: string) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    throw new Error('Not authenticated')
+  }
+
+  const supabase = createAdminClient()
+
+  let profile: Awaited<ReturnType<typeof getUserProfileWithMembership>> = null
+  let permissions: string[] = []
+
+  if (!session.isSuperAdmin) {
+    const activeWorkspaceId = await getActiveWorkspace()
+    profile = await getUserProfileWithMembership(session.user.id, activeWorkspaceId)
+
+    if (!profile || !profile.branch_id) {
+      throw new Error('Invalid workspace')
+    }
+
+    permissions = await getUserPermissions(supabase, profile.id, profile.branch_id, profile.membership_id)
+    if (!hasPermission(permissions, 'manage_positions')) {
+      throw new Error('Unauthorized to update position requests')
+    }
+  }
+
+  const { data: request } = await supabase
+    .from('position_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single()
+
+  if (!request) {
+    throw new Error('Invalid request')
+  }
+
+  if (!session.isSuperAdmin && !permissions.includes('*') && request.branch_id !== profile!.branch_id) {
+    throw new Error('Unauthorized: Request is for a different branch')
+  }
+
+  if (newStatus === 'approved' && request.status !== 'approved') {
+    const { data: existingMembership } = await supabase
+      .from('memberships')
+      .select('id')
+      .eq('profile_id', request.profile_id)
+      .eq('branch_id', request.branch_id)
+      .eq('position_id', request.position_id)
+      .is('ended_at', null)
+      .limit(1)
+
+    if (!existingMembership || existingMembership.length === 0) {
+      const { error: membershipError } = await supabase.from('memberships').insert({
+        profile_id: request.profile_id,
+        branch_id: request.branch_id,
+        position_id: request.position_id,
+        assigned_by: session.user.id,
+        reason: `Position requested. Admin comment: ${adminComment || 'Approved'}`,
+      })
+
+      if (membershipError) {
+        throw new Error('Failed to create new membership.')
+      }
+
+      await supabase.from('notifications').insert({
+        profile_id: request.profile_id,
+        title: 'Position Request Approved',
+        message: `Your request for a new position has been approved.`,
+        link: '/profile#positions',
+      })
+
+      await supabase.from('membership_audit_log').insert({
+        profile_id: request.profile_id,
+        branch_id: request.branch_id,
+        action: 'membership_assigned',
+        changed_by: session.user.id,
+        details: {
+          position_id: request.position_id,
+          source: 'position_request_approval',
+        },
+      })
+    }
+  } else if (newStatus === 'rejected' && request.status !== 'rejected') {
+    await supabase.from('notifications').insert({
+      profile_id: request.profile_id,
+      title: 'Position Request Rejected',
+      message: `Your request for a new position was rejected. Reason: ${adminComment.trim()}`,
+      link: '/profile#positions',
+    })
+  }
+
+  await supabase.from('position_requests').update({
+    status: newStatus,
+    admin_comment: adminComment.trim() || null,
+    decided_by: session.user.id,
+    decided_at: new Date().toISOString(),
+  }).eq('id', requestId)
+
+  if (session?.isSuperAdmin) {
+    await logAdminAction({
+      actorProfileId: session.user!.id,
+      action: 'position_request_updated' as any,
+      entityType: 'membership',
+      entityId: requestId,
+      branchId: request.branch_id,
+      summary: `Updated request status to ${newStatus}`,
+      details: null,
+    })
+  }
+
+  revalidatePath('/position-requests')
+  revalidatePath('/profile')
+  revalidatePath('/superadmin/position-requests')
+  return { success: true }
+}

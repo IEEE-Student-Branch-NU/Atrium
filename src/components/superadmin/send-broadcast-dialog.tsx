@@ -41,11 +41,13 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
   const [error, setError] = useState<string | null>(null)
   
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
-  const [selectedPositions, setSelectedPositions] = useState<string[]>([])
+  const [selectedPositionGroups, setSelectedPositionGroups] = useState<string[]>([])
 
   const filteredPositions = selectedBranches.length > 0 
     ? positions.filter(p => selectedBranches.includes(p.branch_id))
     : positions
+
+  const availablePositionGroups = Array.from(new Set(filteredPositions.map(p => p.name))).sort()
 
   function handleSubmit(formData: FormData) {
     setError(null)
@@ -53,8 +55,12 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
     if (selectedBranches.length > 0) {
       formData.set('branches', JSON.stringify(selectedBranches))
     }
-    if (selectedPositions.length > 0) {
-      formData.set('positions', JSON.stringify(selectedPositions))
+    if (selectedPositionGroups.length > 0) {
+      const resolvedPositionIds = positions
+        .filter(p => selectedPositionGroups.includes(p.name))
+        .filter(p => selectedBranches.length === 0 || selectedBranches.includes(p.branch_id))
+        .map(p => p.id)
+      formData.set('positions', JSON.stringify(resolvedPositionIds))
     }
 
     startTransition(async () => {
@@ -75,23 +81,24 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
       prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
     )
     // Clear selected positions that no longer match the branch filters
-    setSelectedPositions(prev => {
+    setSelectedPositionGroups(prev => {
       const remainingBranchIds = selectedBranches.includes(id) 
         ? selectedBranches.filter(b => b !== id) 
         : [...selectedBranches, id]
       
       if (remainingBranchIds.length === 0) return prev // If no branches selected, all positions are valid
 
-      return prev.filter(posId => {
-        const pos = positions.find(p => p.id === posId)
-        return pos && remainingBranchIds.includes(pos.branch_id)
-      })
+      const nextAvailablePositions = new Set(
+        positions.filter(p => remainingBranchIds.includes(p.branch_id)).map(p => p.name)
+      )
+
+      return prev.filter(name => nextAvailablePositions.has(name))
     })
   }
 
-  function togglePosition(id: string) {
-    setSelectedPositions(prev => 
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+  function togglePositionGroup(name: string) {
+    setSelectedPositionGroups(prev => 
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
     )
   }
 
@@ -152,21 +159,19 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
                 <Label>2. Target Positions {selectedBranches.length > 0 ? '(Filtered)' : '(All Branches)'}</Label>
                 <div className="rounded-md border p-2 h-[160px]">
                   <ScrollArea className="h-full">
-                    {filteredPositions.length === 0 && <span className="text-xs text-muted-foreground">No positions available</span>}
+                    {availablePositionGroups.length === 0 && <span className="text-xs text-muted-foreground">No positions available</span>}
                     <div className="space-y-2 pr-4">
-                      {filteredPositions.map(p => {
-                        const branchName = branches.find(b => b.id === p.branch_id)?.name || 'Unknown Branch'
+                      {availablePositionGroups.map(posName => {
                         return (
-                          <div key={p.id} className="flex items-start space-x-2">
+                          <div key={posName} className="flex items-start space-x-2">
                             <Checkbox 
-                              id={`pos-${p.id}`} 
-                              checked={selectedPositions.includes(p.id)}
-                              onCheckedChange={() => togglePosition(p.id)}
+                              id={`pos-group-${posName}`} 
+                              checked={selectedPositionGroups.includes(posName)}
+                              onCheckedChange={() => togglePositionGroup(posName)}
                               className="mt-0.5"
                             />
-                            <Label htmlFor={`pos-${p.id}`} className="text-sm font-normal cursor-pointer leading-tight flex flex-col">
-                              <span>{p.name}</span>
-                              <span className="text-[10px] text-muted-foreground">{branchName}</span>
+                            <Label htmlFor={`pos-group-${posName}`} className="text-sm font-normal cursor-pointer leading-tight flex flex-col">
+                              <span>{posName}</span>
                             </Label>
                           </div>
                         )
@@ -174,8 +179,8 @@ export function SendBroadcastDialog({ branches = [], positions = [] }: SendBroad
                     </div>
                   </ScrollArea>
                 </div>
-                {selectedPositions.length > 0 && (
-                  <p className="text-xs text-muted-foreground text-right">{selectedPositions.length} selected</p>
+                {selectedPositionGroups.length > 0 && (
+                  <p className="text-xs text-muted-foreground text-right">{selectedPositionGroups.length} selected</p>
                 )}
               </div>
             </div>

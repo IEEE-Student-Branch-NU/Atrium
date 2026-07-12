@@ -32,7 +32,7 @@ export default async function NotificationsHistoryPage() {
         <SendBroadcastDialog branches={branches} positions={positions} />
       </div>
 
-      <NotificationsList notifications={notifications} />
+      <NotificationsList notifications={notifications} branches={branches} positions={positions} />
     </div>
   )
 }

@@ -14,13 +14,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
   Megaphone, AlertTriangle, CheckCircle, XCircle, 
-  Info, Clock, ExternalLink, MoreHorizontal, Pencil, Trash2 
+  Info, Clock, ExternalLink, MoreHorizontal, Pencil, Trash2, Bell, CheckCircle2, Edit 
 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -40,7 +39,28 @@ import { editBroadcast, deleteBroadcast } from '@/app/superadmin/actions'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
-export function NotificationsList({ notifications }: { notifications: any[] }) {
+interface NotificationsListProps {
+  notifications: any[]
+  branches?: { id: string; name: string }[]
+  positions?: { id: string; name: string; branch_id: string }[]
+}
+
+function getTypeConfig(type: string) {
+  switch (type?.toLowerCase()) {
+    case 'info':
+      return { icon: Info, className: 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20' }
+    case 'warning':
+      return { icon: AlertTriangle, className: 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20' }
+    case 'error':
+      return { icon: XCircle, className: 'bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20' }
+    case 'success':
+      return { icon: CheckCircle2, className: 'bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20' }
+    default:
+      return { icon: Bell, className: 'bg-slate-500/10 text-slate-500 hover:bg-slate-500/20 border-slate-500/20' }
+  }
+}
+
+export function NotificationsList({ notifications, branches = [], positions = [] }: NotificationsListProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   
@@ -110,24 +130,29 @@ export function NotificationsList({ notifications }: { notifications: any[] }) {
   return (
     <>
       <Card>
-        <Table>
-          <TableHeader>
+        <CardContent className="p-0 sm:p-4">
+          <Table>
+            <TableHeader>
             <TableRow>
               <TableHead>Type</TableHead>
               <TableHead>Notification</TableHead>
-              <TableHead>Recipient</TableHead>
+              <TableHead>Recipients</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Sent</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {notifications.map((n) => {
               const isBroadcast = !!n.broadcast_id
+              const config = getTypeConfig(n.type)
+              const Icon = config.icon
+
               return (
                 <TableRow key={n.id}>
                   <TableCell>
-                    <Badge variant="outline" className="capitalize">
+                    <Badge variant="outline" className={`capitalize flex items-center gap-1.5 w-fit -ml-1 ${config.className}`}>
+                      <Icon className="h-3 w-3" />
                       {n.type}
                     </Badge>
                   </TableCell>
@@ -144,13 +169,46 @@ export function NotificationsList({ notifications }: { notifications: any[] }) {
                   </TableCell>
                   <TableCell>
                     {isBroadcast ? (
-                      <div className="flex flex-col">
-                        {n.target_filters ? (
-                           <Badge variant="secondary" className="w-fit border-blue-200 bg-blue-50 text-blue-700">Targeted Broadcast</Badge>
+                      <div className="flex flex-col gap-1.5">
+                        {(n.target_filters && (n.target_filters.branches?.length > 0 || n.target_filters.positions?.length > 0)) ? (
+                          <div className="flex flex-wrap gap-1">
+                            {(() => {
+                              const bIds = n.target_filters.branches || []
+                              const pIds = n.target_filters.positions || []
+                              
+                              const bNames = bIds.map((id: string) => branches.find(b => b.id === id)?.name).filter(Boolean) as string[]
+                              const pNames = Array.from(new Set(pIds.map((id: string) => positions.find(p => p.id === id)?.name).filter(Boolean))) as string[]
+                              
+                              return (
+                                <>
+                                  {bNames.length > 0 && bNames.map((name: string) => (
+                                    <Badge key={name} variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/10 font-normal">
+                                      {name}
+                                    </Badge>
+                                  ))}
+                                  {bNames.length === 0 && pNames.length > 0 && (
+                                    <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/10 font-normal">
+                                      All Branches
+                                    </Badge>
+                                  )}
+                                  {pNames.length > 0 && pNames.map((name: string) => (
+                                    <Badge key={name} variant="outline" className="font-normal border-primary/20 text-primary">
+                                      {name}
+                                    </Badge>
+                                  ))}
+                                  {pNames.length === 0 && bNames.length > 0 && (
+                                    <Badge variant="outline" className="font-normal border-primary/20 text-primary">
+                                      All Positions
+                                    </Badge>
+                                  )}
+                                </>
+                              )
+                            })()}
+                          </div>
                         ) : (
                            <Badge variant="secondary" className="w-fit">Global Broadcast</Badge>
                         )}
-                        <span className="text-xs text-muted-foreground mt-1">{n.recipient_count} recipients</span>
+                        <span className="text-xs text-muted-foreground">{n.recipient_count} total users</span>
                       </div>
                     ) : (
                       <div>
@@ -175,15 +233,13 @@ export function NotificationsList({ notifications }: { notifications: any[] }) {
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {new Date(n.created_at).toLocaleString('en-IN', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    <div className="flex flex-col">
+                      <span>{new Date(n.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span className="text-xs">{new Date(n.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    {isBroadcast && (
+                  <TableCell>
+                    {isBroadcast ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -204,6 +260,8 @@ export function NotificationsList({ notifications }: { notifications: any[] }) {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                    ) : (
+                      <span className="text-muted-foreground ml-2">—</span>
                     )}
                   </TableCell>
                 </TableRow>
@@ -211,7 +269,8 @@ export function NotificationsList({ notifications }: { notifications: any[] }) {
             })}
           </TableBody>
         </Table>
-      </Card>
+      </CardContent>
+    </Card>
 
       {/* Edit Broadcast Dialog */}
       <Dialog open={!!editingBroadcast} onOpenChange={(v) => !v && setEditingBroadcast(null)}>
@@ -227,7 +286,7 @@ export function NotificationsList({ notifications }: { notifications: any[] }) {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-type">Notification Type</Label>
-                <Select value={editType} onValueChange={setEditType}>
+                <Select value={editType} onValueChange={(val) => val && setEditType(val)}>
                   <SelectTrigger id="edit-type">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>

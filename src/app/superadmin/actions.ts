@@ -382,10 +382,12 @@ export async function sendBroadcastMessage(formData: FormData) {
     return { error: 'No active users match the selected filters.' }
   }
 
-  const target_filters = {
-    branches: targetBranches.length > 0 ? targetBranches : null,
-    positions: targetPositions.length > 0 ? targetPositions : null,
-  }
+  const target_filters = targetBranches.length === 0 && targetPositions.length === 0
+    ? null
+    : {
+        branches: targetBranches.length > 0 ? targetBranches : null,
+        positions: targetPositions.length > 0 ? targetPositions : null,
+      }
 
   // Bulk insert notifications
   const broadcast_id = crypto.randomUUID()

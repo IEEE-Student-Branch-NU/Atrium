@@ -282,15 +282,24 @@ export async function listPositionsGrouped(): Promise<PositionGroup[]> {
 
 export type DecidedPositionRequest = {
   id: string
+  profile_id: string
   profile_name: string | null
   profile_email: string
   branch_name: string
   position_name: string
   status: string
+  reason: string
+  description: string | null
+  supporting_notes: string | null
   admin_comment: string | null
   decided_by_name: string | null
   decided_at: string | null
   created_at: string
+  profile_bio: string | null
+  profile_skills: string[] | null
+  profile_phone: string | null
+  profile_section: string | null
+  profile_ieee_membership_id: string | null
 }
 
 export async function getRecentDecidedPositionRequests(limit = 25): Promise<DecidedPositionRequest[]> {
@@ -298,8 +307,8 @@ export async function getRecentDecidedPositionRequests(limit = 25): Promise<Deci
   const { data } = await supabase
     .from('position_requests')
     .select(`
-      id, status, admin_comment, decided_at, created_at,
-      profiles!position_requests_profile_id_fkey(full_name, email),
+      id, profile_id, status, reason, description, supporting_notes, admin_comment, decided_at, created_at,
+      profiles!position_requests_profile_id_fkey(full_name, email, bio, skills, phone, section, ieee_membership_id),
       branches(name),
       positions(name),
       decided_by:profiles!position_requests_decided_by_fkey(full_name)
@@ -308,17 +317,28 @@ export async function getRecentDecidedPositionRequests(limit = 25): Promise<Deci
     .order('decided_at', { ascending: false })
     .limit(limit)
 
-  return (data ?? []).map((r) => ({
+  if (!data) return []
+
+  return data.map((r) => ({
     id: r.id,
-    profile_name: (r.profiles as unknown as { full_name: string | null } | null)?.full_name ?? null,
-    profile_email: (r.profiles as unknown as { email: string | null } | null)?.email ?? '',
-    branch_name: (r.branches as unknown as { name: string } | null)?.name ?? 'Unknown',
-    position_name: (r.positions as unknown as { name: string } | null)?.name ?? 'Unknown',
+    profile_id: r.profile_id,
+    profile_name: (r.profiles as any)?.full_name ?? null,
+    profile_email: (r.profiles as any)?.email ?? '',
+    branch_name: (r.branches as any)?.name ?? 'Unknown',
+    position_name: (r.positions as any)?.name ?? 'Unknown',
     status: r.status,
+    reason: r.reason,
+    description: r.description,
+    supporting_notes: r.supporting_notes,
     admin_comment: r.admin_comment,
-    decided_by_name: (r.decided_by as unknown as { full_name: string | null } | null)?.full_name ?? null,
+    decided_by_name: (r.decided_by as any)?.full_name ?? null,
     decided_at: r.decided_at,
     created_at: r.created_at,
+    profile_bio: (r.profiles as any)?.bio ?? null,
+    profile_skills: (r.profiles as any)?.skills ?? null,
+    profile_phone: (r.profiles as any)?.phone ?? null,
+    profile_section: (r.profiles as any)?.section ?? null,
+    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
   }))
 }
 

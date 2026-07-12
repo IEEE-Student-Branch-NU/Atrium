@@ -117,10 +117,18 @@ Atrium/
 
 ## 📖 Documentation
 
+**👉 Start at [docs/README.md](docs/README.md)** — the full developer documentation index (what/how/why/gotchas for every feature). Highlights:
+
 | Document | Description |
 |----------|-------------|
-| **[AUTH.md](docs/AUTH.md)** | Complete authentication & authorization reference. Covers Google OAuth flow, email/password signup, middleware route protection, permission engine, and security considerations. Includes Mermaid diagrams for every flow. *(Note: AUTH.md itself still describes the retired passphrase-based "sudo mode" — see [docs/SCHEMA.md §1.7](docs/SCHEMA.md#17-invisible-superadmin-identity-no-profiles-flag) for the current invisible-SuperAdmin model; a follow-up pass on AUTH.md is flagged but out of scope here.)* |
-| **[SCHEMA.md](docs/SCHEMA.md)** | Database schema reference (v2). Every table, enum, trigger, index, and seed record — with ERD, permission matrix, and key query patterns. The single source of truth for the database. |
+| **[docs/README.md](docs/README.md)** | Documentation index & "start here" map |
+| **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** | System overview, request lifecycle, Edge/Node split, directory map |
+| **[ENGINEERING.md](docs/ENGINEERING.md)** | Conventions, patterns, gotchas, "add a feature" recipe |
+| **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Setup, complete env-var list, migrations, verification |
+| **[AUTH.md](docs/AUTH.md)** | Authentication & identity: NextAuth, Google/credentials, super-admin, middleware (current invisible-super-admin model) |
+| **[PERMISSIONS.md](docs/PERMISSIONS.md)** | Positions + permissions + memberships; how access is computed |
+| **[SCHEMA.md](docs/SCHEMA.md)** | Database schema reference (v2) — every table, enum, index, migration |
+| **[features/](docs/features/)** | Per-feature deep dives: notifications, super-admin portal, impersonation, workspace switching, approvals, position requests, members, dashboard, events |
 
 ---
 

@@ -1,4 +1,4 @@
-import { requireSuperAdmin } from '@/utils/auth/superadmin'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { getAllNotifications } from '@/app/superadmin/queries'
 import { NotificationsList } from './notifications-list'
@@ -10,8 +10,8 @@ export const metadata = {
 }
 
 export default async function NotificationsHistoryPage() {
-  const session = await requireSuperAdmin()
-  if (!session) redirect('/superadmin/login')
+  const session = await auth()
+  if (!session?.isSuperAdmin) redirect('/login')
 
   const [notifications, branchesResult, positionsResult] = await Promise.all([
     getAllNotifications(200),

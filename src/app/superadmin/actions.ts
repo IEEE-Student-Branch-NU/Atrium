@@ -338,17 +338,30 @@ export async function sendBroadcastMessage(formData: FormData) {
   }
 
   const supabase = createAdminClient()
-  const { error } = await supabase
-    .from('notifications')
-    .insert({
-      profile_id: null,
-      title,
-      message,
-      type,
-    })
+  
+  // Get all profile IDs
+  const { data: profiles, error: fetchError } = await supabase
+    .from('profiles')
+    .select('id')
 
-  if (error) {
-    return { error: error.message }
+  if (fetchError || !profiles || profiles.length === 0) {
+    return { error: 'Failed to fetch users or no users found' }
+  }
+
+  // Bulk insert notifications
+  const notifications = profiles.map(p => ({
+    profile_id: p.id,
+    title,
+    message,
+    type,
+    is_read: false
+  }))
+
+  // Insert in chunks to avoid hitting payload limits if user count grows
+  for (let i = 0; i < notifications.length; i += 1000) {
+    const chunk = notifications.slice(i, i + 1000)
+    const { error } = await supabase.from('notifications').insert(chunk)
+    if (error) return { error: error.message }
   }
 
   await logAdminAction({

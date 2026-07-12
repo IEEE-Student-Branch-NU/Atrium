@@ -31,3 +31,8 @@ CREATE POLICY "Users can read own or broadcast notifications"
 -- 5. Add the notifications table to the supabase_realtime publication
 -- The publication 'supabase_realtime' is created by default in Supabase projects.
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+-- Enable Realtime for profiles and memberships
+-- This allows the Next.js client to listen for changes via websockets
+
+ALTER PUBLICATION supabase_realtime ADD TABLE profiles;
+ALTER PUBLICATION supabase_realtime ADD TABLE memberships;

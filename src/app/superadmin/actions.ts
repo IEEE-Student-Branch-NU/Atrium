@@ -349,7 +349,9 @@ export async function sendBroadcastMessage(formData: FormData) {
   }
 
   // Bulk insert notifications
+  const broadcast_id = crypto.randomUUID()
   const notifications = profiles.map(p => ({
+    broadcast_id,
     profile_id: p.id,
     title,
     message,
@@ -374,5 +376,48 @@ export async function sendBroadcastMessage(formData: FormData) {
     details: { type },
   })
 
+  return { success: true }
+}
+
+export async function editBroadcast(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+
+  const broadcast_id = String(formData.get('broadcast_id') ?? '').trim()
+  const title = String(formData.get('title') ?? '').trim()
+  const message = String(formData.get('message') ?? '').trim()
+  const type = String(formData.get('type') ?? 'info')
+
+  if (!broadcast_id || !title || !message) {
+    return { error: 'Missing required fields' }
+  }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('notifications')
+    .update({ title, message, type, is_edited: true })
+    .eq('broadcast_id', broadcast_id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/superadmin/notifications')
+  return { success: true }
+}
+
+export async function deleteBroadcast(broadcastId: string) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+
+  if (!broadcastId) return { error: 'Missing broadcast ID' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('broadcast_id', broadcastId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/superadmin/notifications')
   return { success: true }
 }

@@ -273,6 +273,7 @@ export interface Notification {
   is_read: boolean
   type: 'normal' | 'broadcast' | 'warning' | 'success' | 'error'
   created_at: string
+  is_edited: boolean
 }
 
 export async function getUnreadNotifications(profileId: string): Promise<Notification[]> {
@@ -280,7 +281,7 @@ export async function getUnreadNotifications(profileId: string): Promise<Notific
 
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, title, message, link, is_read, type, created_at')
+    .select('id, title, message, link, is_read, type, created_at, is_edited')
     .eq('profile_id', profileId)
     .eq('is_read', false)
     .order('created_at', { ascending: false })
@@ -295,7 +296,7 @@ export async function getNotifications(profileId: string, limit = 50): Promise<N
 
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, title, message, link, is_read, type, created_at')
+    .select('id, title, message, link, is_read, type, created_at, is_edited')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false })
     .limit(limit)

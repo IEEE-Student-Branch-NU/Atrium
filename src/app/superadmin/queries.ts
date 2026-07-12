@@ -390,11 +390,33 @@ export async function getAuditLog(opts: {
 export async function getAllNotifications(limit = 100) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
-    .from('notifications')
-    .select('id, title, message, type, is_read, created_at, profile_id, profiles(full_name, email)')
+    .from('admin_notification_history')
+    .select('id, broadcast_id, title, message, type, created_at, recipient_count, read_count, single_profile_id, is_edited')
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error) console.error('Error fetching all notifications:', error)
-  return data ?? []
+  if (error) {
+    console.error('Error fetching all notifications:', error)
+    return []
+  }
+
+  // Enrich personal notifications with profile info
+  const profileIds = data.map(n => n.single_profile_id).filter(Boolean) as string[]
+  let profilesMap = new Map<string, { full_name: string, email: string }>()
+  
+  if (profileIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', profileIds)
+    
+    if (profiles) {
+      profiles.forEach(p => profilesMap.set(p.id, p))
+    }
+  }
+
+  return data.map(n => ({
+    ...n,
+    profiles: n.single_profile_id ? profilesMap.get(n.single_profile_id) : null
+  }))
 }

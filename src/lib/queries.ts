@@ -14,25 +14,22 @@ export interface DashboardStats {
 export async function getDashboardStats(branchId?: string): Promise<DashboardStats> {
   const supabase = createAdminClient()
 
-  // Active approved members
-  const membersQuery = supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'approved')
-  const { count: totalMembers } = await membersQuery
-
-  // Pending registrations
-  const { count: pendingRegistrations } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'pending')
-
-  // Events by status
+  // These three reads are independent — run them concurrently so the total
+  // latency is one round-trip, not three.
   let eventsQuery = supabase.from('events').select('status')
   if (branchId) {
     eventsQuery = eventsQuery.eq('branch_id', branchId)
   }
-  const { data: events } = await eventsQuery
+
+  const [membersRes, pendingRes, eventsRes] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    eventsQuery,
+  ])
+
+  const totalMembers = membersRes.count
+  const pendingRegistrations = pendingRes.count
+  const events = eventsRes.data
 
   const totalEvents = events?.length ?? 0
   const draftEvents = events?.filter((e) => e.status === 'draft').length ?? 0
@@ -113,40 +110,46 @@ export async function getUserProfileWithMembership(
   activeMembershipId?: string | null
 ): Promise<UserProfileWithMembership | null> {
   const supabase = createAdminClient()
+  const MEMBERSHIP_COLS = 'id, branch_id, position_id, branches(name, slug), positions(name)'
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, status, bio, skills, section, created_at')
-    .eq('id', profileId)
-    .single()
-
-  if (!profile) return null
-
-  // If a specific membership is requested, fetch that one
-  let membership: any = null
-
-  if (activeMembershipId) {
-    const { data } = await supabase
+  const firstActiveMembership = () =>
+    supabase
       .from('memberships')
-      .select('id, branch_id, position_id, branches(name, slug), positions(name)')
-      .eq('id', activeMembershipId)
-      .eq('profile_id', profileId)
-      .is('ended_at', null)
-      .single()
-    membership = data
-  }
-
-  // Fallback: get first active membership
-  if (!membership) {
-    const { data } = await supabase
-      .from('memberships')
-      .select('id, branch_id, position_id, branches(name, slug), positions(name)')
+      .select(MEMBERSHIP_COLS)
       .eq('profile_id', profileId)
       .is('ended_at', null)
       .order('assigned_at', { ascending: true })
       .limit(1)
       .single()
-    membership = data
+
+  // The profile read and the primary membership read are independent — run
+  // them concurrently. If a specific membership was requested but not found,
+  // fall back to the first active membership (rare second round-trip).
+  const primaryMembership = () =>
+    activeMembershipId
+      ? supabase
+          .from('memberships')
+          .select(MEMBERSHIP_COLS)
+          .eq('id', activeMembershipId)
+          .eq('profile_id', profileId)
+          .is('ended_at', null)
+          .single()
+      : firstActiveMembership()
+
+  const [{ data: profile }, primaryRes] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, email, full_name, avatar_url, phone, ieee_membership_id, status, bio, skills, section, created_at')
+      .eq('id', profileId)
+      .single(),
+    primaryMembership(),
+  ])
+
+  if (!profile) return null
+
+  let membership: any = primaryRes.data
+  if (!membership && activeMembershipId) {
+    membership = (await firstActiveMembership()).data
   }
 
   return {
@@ -455,6 +458,24 @@ export async function getPositionsForBranch(branchId: string): Promise<PositionO
     .eq('branch_id', branchId)
     .order('name')
   return data ?? []
+}
+
+/**
+ * All positions across all branches, grouped by branch id, in ONE query.
+ * Use this instead of calling getPositionsForBranch per branch (N+1).
+ */
+export async function getPositionsGroupedByBranch(): Promise<Record<string, PositionOption[]>> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('positions')
+    .select('id, name, branch_id')
+    .order('name')
+
+  const grouped: Record<string, PositionOption[]> = {}
+  for (const p of data ?? []) {
+    ;(grouped[p.branch_id] ??= []).push(p as PositionOption)
+  }
+  return grouped
 }
 
 // ── Pending Registrations ────────────────────────────────────

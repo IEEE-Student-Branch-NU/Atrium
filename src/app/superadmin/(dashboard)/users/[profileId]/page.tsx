@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getAllBranches, getPositionsForBranch, type PositionOption } from '@/lib/queries'
+import { getAllBranches, getPositionsGroupedByBranch } from '@/lib/queries'
 import { getUserAdminDetail, getAllPermissions } from '@/app/superadmin/queries'
 import { openWorkspace, removePosition, revokePermission } from '@/app/superadmin/actions'
 import { AssignPositionDialog, GrantPermissionDialog } from '../user-actions'
@@ -62,20 +62,15 @@ export default async function UserDetailPage({
 }) {
   const { profileId } = await params
 
-  const [detail, branches, permissions] = await Promise.all([
+  // The assign-position dialog needs the full per-branch option set up front.
+  // Fetch it in ONE query grouped by branch (previously one query per branch).
+  const [detail, branches, permissions, positionsByBranch] = await Promise.all([
     getUserAdminDetail(profileId),
     getAllBranches(),
     getAllPermissions(),
+    getPositionsGroupedByBranch(),
   ])
   if (!detail) notFound()
-
-  // Positions are branch-scoped, so the assign-position dialog needs the
-  // full per-branch option set up front rather than fetching on each
-  // branch selection.
-  const positionsByBranchEntries = await Promise.all(
-    branches.map(async (b): Promise<[string, PositionOption[]]> => [b.id, await getPositionsForBranch(b.id)])
-  )
-  const positionsByBranch = Object.fromEntries(positionsByBranchEntries)
 
   const { profile, memberships, grants } = detail
   const activeMemberships = memberships.filter((m) => !m.ended_at)

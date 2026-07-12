@@ -333,6 +333,34 @@ export async function getAllNotifications(opts: {
   }
 }
 
+/** Active workspaces (memberships) for a set of profiles — for the users-list quick open. */
+export type ProfileWorkspace = { membership_id: string; branch_name: string; position_name: string }
+
+export async function getActiveMembershipsForProfiles(
+  profileIds: string[],
+): Promise<Record<string, ProfileWorkspace[]>> {
+  if (profileIds.length === 0) return {}
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('memberships')
+    .select('id, profile_id, assigned_at, branches(name), positions(name)')
+    .in('profile_id', profileIds)
+    .is('ended_at', null)
+    .order('assigned_at', { ascending: true })
+
+  const map: Record<string, ProfileWorkspace[]> = {}
+  for (const m of data ?? []) {
+    const arr = map[m.profile_id] ?? []
+    arr.push({
+      membership_id: m.id,
+      branch_name: (m.branches as unknown as { name: string } | null)?.name ?? 'Unknown',
+      position_name: (m.positions as unknown as { name: string } | null)?.name ?? 'Member',
+    })
+    map[m.profile_id] = arr
+  }
+  return map
+}
+
 /** Branches for the send-dialog / feed filter. */
 export async function getBranchOptions(): Promise<{ id: string; name: string }[]> {
   const supabase = createAdminClient()

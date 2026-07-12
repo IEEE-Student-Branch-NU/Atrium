@@ -25,7 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { listUsers } from '@/app/superadmin/queries'
+import { listUsers, getActiveMembershipsForProfiles } from '@/app/superadmin/queries'
+import { OpenWorkspaceMenu } from '@/components/superadmin/open-workspace-menu'
 
 const PAGE_SIZE = 25
 
@@ -64,6 +65,9 @@ export default async function UsersPage({
     pageSize: PAGE_SIZE,
   })
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  // One batched query for the visible page → per-user "Open workspace" access.
+  const workspacesByProfile = await getActiveMembershipsForProfiles(rows.map((u) => u.id))
 
   function pageHref(targetPage: number): string {
     const params = new URLSearchParams()
@@ -142,6 +146,7 @@ export default async function UsersPage({
                     <TableHead>Email</TableHead>
                     <TableHead>IEEE ID</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Workspace</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -161,6 +166,12 @@ export default async function UsersPage({
                       </TableCell>
                       <TableCell>
                         <Badge variant={statusVariant(u.status)}>{u.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <OpenWorkspaceMenu
+                          memberships={workspacesByProfile[u.id] ?? []}
+                          userName={u.full_name || 'this user'}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

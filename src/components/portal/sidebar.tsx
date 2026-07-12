@@ -22,7 +22,9 @@ import {
   Briefcase,
   ChevronsUpDown,
   Check,
+  Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -149,16 +151,22 @@ function RoleSwitcher({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [switchingId, setSwitchingId] = useState<string | null>(null)
 
   const activeMembership = memberships.find((m) => m.id === activeMembershipId)
 
-  async function handleSwitch(membershipId: string) {
-    if (membershipId === activeMembershipId) return
+  function handleSwitch(m: UserMembership) {
+    if (m.id === activeMembershipId) return
+    setSwitchingId(m.id)
     startTransition(async () => {
-      const result = await switchWorkspace(membershipId)
+      const result = await switchWorkspace(m.id)
       if (result.success) {
+        toast.success(`Switched to ${m.position_name ?? 'Member'} · ${m.branch_name}`)
         router.refresh()
+      } else {
+        toast.error(result.error ?? 'Could not switch workspace')
       }
+      setSwitchingId(null)
     })
   }
 
@@ -186,16 +194,18 @@ function RoleSwitcher({
                 {memberships.map((m) => (
                   <DropdownMenuItem
                     key={m.id}
-                    onClick={() => handleSwitch(m.id)}
+                    onClick={() => handleSwitch(m)}
                     className="flex items-center justify-between"
                   >
                     <div>
                       <p className="text-sm font-medium">{m.position_name ?? 'Member'}</p>
                       <p className="text-xs text-muted-foreground">{m.branch_name}</p>
                     </div>
-                    {m.id === activeMembershipId && (
+                    {switchingId === m.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : m.id === activeMembershipId ? (
                       <Check className="h-4 w-4 text-emerald-500" />
-                    )}
+                    ) : null}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -235,16 +245,18 @@ function RoleSwitcher({
           {memberships.map((m) => (
             <DropdownMenuItem
               key={m.id}
-              onClick={() => handleSwitch(m.id)}
+              onClick={() => handleSwitch(m)}
               className="flex items-center justify-between cursor-pointer"
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{m.position_name ?? 'Member'}</p>
                 <p className="text-xs text-muted-foreground truncate">{m.branch_name}</p>
               </div>
-              {m.id === activeMembershipId && (
+              {switchingId === m.id ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+              ) : m.id === activeMembershipId ? (
                 <Check className="h-4 w-4 shrink-0 text-emerald-500" />
-              )}
+              ) : null}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

@@ -20,7 +20,7 @@ import {
   getOrganizationTree,
   getRecentActivityFeed,
   type OrgNode,
-} from './queries'
+} from '@/app/superadmin/queries'
 import { SendBroadcastDialog } from '@/components/superadmin/send-broadcast-dialog'
 
 // ── Helper: format time ago ──────────────────────────────────

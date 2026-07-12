@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { getAllBranches } from '@/lib/queries'
-import { listPositionsGrouped, getAllPermissions } from '../queries'
+import { listPositionsGrouped, getAllPermissions } from '@/app/superadmin/queries'
 import { CreatePositionForm, PositionCard } from './position-controls'
 
 // ── Page ─────────────────────────────────────────────────────

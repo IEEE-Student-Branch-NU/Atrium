@@ -18,9 +18,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { getBranchDetail, getBranchMembers, getBranchPositions, type MemberRow } from '../../queries'
+import { getBranchDetail, getBranchMembers, getBranchPositions, type MemberRow } from '@/app/superadmin/queries'
 import { classifyMembers } from '@/utils/positions'
-import { openWorkspace } from '../../actions'
+import { openWorkspace } from '@/app/superadmin/actions'
 import { CreateOrgDialog } from '../create-org-dialog'
 
 // `openWorkspace` returns `{ error }` on the unauthorized/not-found paths,

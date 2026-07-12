@@ -6,7 +6,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 const { auth } = NextAuth(authConfig)
 
 // Routes that don't require authentication at all
-const PUBLIC_ROUTES = ['/login', '/signup', '/api/auth']
+const PUBLIC_ROUTES = ['/login', '/signup', '/superadmin/login', '/api/auth']
 
 // Routes that require auth but NOT approval
 const AUTH_ONLY_ROUTES = ['/pending', '/rejected', '/complete-registration']
@@ -26,7 +26,11 @@ export async function authMiddleware(request: NextRequest) {
   // Not logged in + not on a public route → redirect to login
   if (!session?.user && !isPublicRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    if (pathname.startsWith('/superadmin')) {
+      url.pathname = '/superadmin/login'
+    } else {
+      url.pathname = '/login'
+    }
     return NextResponse.redirect(url)
   }
 
@@ -46,7 +50,7 @@ export async function authMiddleware(request: NextRequest) {
     // Not impersonating → send them into their portal from any entry point.
     if (
       !impersonating &&
-      (pathname === '/' || pathname === '/login' || pathname === '/signup')
+      (pathname === '/' || pathname === '/login' || pathname === '/signup' || pathname === '/superadmin/login')
     ) {
       return NextResponse.redirect(new URL('/superadmin', request.url))
     }
@@ -57,12 +61,12 @@ export async function authMiddleware(request: NextRequest) {
   }
 
   // Non-super-admins may not access the portal.
-  if (pathname.startsWith('/superadmin')) {
+  if (pathname.startsWith('/superadmin') && pathname !== '/superadmin/login') {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
   // Logged in + on login/signup → redirect based on status
-  if (session?.user && (pathname === '/login' || pathname === '/signup')) {
+  if (session?.user && (pathname === '/login' || pathname === '/signup' || pathname === '/superadmin/login')) {
     const supabase = createAdminClient()
 
     const { data: profile } = await supabase

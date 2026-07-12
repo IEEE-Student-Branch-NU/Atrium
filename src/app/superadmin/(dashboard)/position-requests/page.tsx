@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { getPendingPositionRequests } from '@/lib/queries'
-import { getRecentDecidedPositionRequests } from '../queries'
+import { getRecentDecidedPositionRequests } from '@/app/superadmin/queries'
 import { RequestControls } from './request-controls'
 
 const HISTORY_LIMIT = 25

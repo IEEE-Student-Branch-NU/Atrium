@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { listUsers } from '../queries'
+import { listUsers } from '@/app/superadmin/queries'
 
 const PAGE_SIZE = 25
 

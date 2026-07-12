@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getAuditLog } from '../queries'
+import { getAuditLog } from '@/app/superadmin/queries'
 
 const PAGE_SIZE = 50
 

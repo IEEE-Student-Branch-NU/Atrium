@@ -19,8 +19,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { getAllBranches, getPositionsForBranch, type PositionOption } from '@/lib/queries'
-import { getUserAdminDetail, getAllPermissions } from '../../queries'
-import { openWorkspace, removePosition, revokePermission } from '../../actions'
+import { getUserAdminDetail, getAllPermissions } from '@/app/superadmin/queries'
+import { openWorkspace, removePosition, revokePermission } from '@/app/superadmin/actions'
 import { AssignPositionDialog, GrantPermissionDialog } from '../user-actions'
 
 // `openWorkspace`, `removePosition`, and `revokePermission` return `{ error }`

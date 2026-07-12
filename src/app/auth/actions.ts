@@ -41,6 +41,33 @@ export async function signInWithEmail(formData: FormData) {
 }
 
 /**
+ * Sign in with email and password as Superadmin.
+ * Passes the isSuperAdminLogin flag to Credentials provider.
+ */
+export async function signInAsSuperadmin(formData: FormData) {
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+
+  if (!email || !password) {
+    return { error: 'Email and password are required.' }
+  }
+
+  try {
+    await nextAuthSignIn('credentials', {
+      email,
+      password,
+      isSuperAdminLogin: 'true',
+      redirectTo: '/superadmin',
+    })
+  } catch (error: any) {
+    if (error?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw error
+    }
+    return { error: 'Invalid superadmin credentials.' }
+  }
+}
+
+/**
  * Sign up with email, password, and IEEE membership details.
  * Password is hashed with bcrypt before storing in the database.
  */

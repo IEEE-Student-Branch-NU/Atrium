@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { getOrganizationTree, type OrgNode } from '../queries'
+import { getOrganizationTree, type OrgNode } from '@/app/superadmin/queries'
 import { CreateOrgDialog } from './create-org-dialog'
 
 // ── Organization Tree Row (recursive) ────────────────────────

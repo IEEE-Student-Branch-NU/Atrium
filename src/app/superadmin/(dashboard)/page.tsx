@@ -20,7 +20,7 @@ import {
   getOrganizationTree,
   getRecentActivityFeed,
   type OrgNode,
-} from './queries'
+} from '@/app/superadmin/queries'
 
 // ── Helper: format time ago ──────────────────────────────────
 // Mirrors the formatter in src/app/(portal)/page.tsx.

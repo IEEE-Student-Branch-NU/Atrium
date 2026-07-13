@@ -96,18 +96,18 @@ export function TopBar({ user, title, unreadCount = 0 }: TopBarProps) {
 
         {/* User Menu */}
         <DropdownMenu>
-          <DropdownMenuTrigger >
-            <Button variant="ghost" className="relative h-9 gap-2 rounded-full px-2">
-              <Avatar className="h-7 w-7">
-                <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />
-                <AvatarFallback className="text-xs font-medium">
-                  {getInitials(user.name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm font-medium md:inline-block">
-                {user.name?.split(' ')[0] ?? 'User'}
-              </span>
-            </Button>
+          <DropdownMenuTrigger render={
+            <Button variant="ghost" className="relative h-9 gap-2 rounded-full px-2" />
+          }>
+            <Avatar className="h-7 w-7">
+              <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />
+              <AvatarFallback className="text-xs font-medium">
+                {getInitials(user.name)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="hidden text-sm font-medium md:inline-block">
+              {user.name?.split(' ')[0] ?? 'User'}
+            </span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>

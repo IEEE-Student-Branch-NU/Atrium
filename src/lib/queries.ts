@@ -14,25 +14,22 @@ export interface DashboardStats {
 export async function getDashboardStats(branchId?: string): Promise<DashboardStats> {
   const supabase = createAdminClient()
 
-  // Active approved members
-  const membersQuery = supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'approved')
-  const { count: totalMembers } = await membersQuery
-
-  // Pending registrations
-  const { count: pendingRegistrations } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'pending')
-
-  // Events by status
+  // These three reads are independent — run them concurrently so the total
+  // latency is one round-trip, not three.
   let eventsQuery = supabase.from('events').select('status')
   if (branchId) {
     eventsQuery = eventsQuery.eq('branch_id', branchId)
   }
-  const { data: events } = await eventsQuery
+
+  const [membersRes, pendingRes, eventsRes] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    eventsQuery,
+  ])
+
+  const totalMembers = membersRes.count
+  const pendingRegistrations = pendingRes.count
+  const events = eventsRes.data
 
   const totalEvents = events?.length ?? 0
   const draftEvents = events?.filter((e) => e.status === 'draft').length ?? 0
@@ -113,40 +110,46 @@ export async function getUserProfileWithMembership(
   activeMembershipId?: string | null
 ): Promise<UserProfileWithMembership | null> {
   const supabase = createAdminClient()
+  const MEMBERSHIP_COLS = 'id, branch_id, position_id, branches(name, slug), positions(name)'
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, status, bio, skills, section, created_at')
-    .eq('id', profileId)
-    .single()
-
-  if (!profile) return null
-
-  // If a specific membership is requested, fetch that one
-  let membership: any = null
-
-  if (activeMembershipId) {
-    const { data } = await supabase
+  const firstActiveMembership = () =>
+    supabase
       .from('memberships')
-      .select('id, branch_id, position_id, branches(name, slug), positions(name)')
-      .eq('id', activeMembershipId)
-      .eq('profile_id', profileId)
-      .is('ended_at', null)
-      .single()
-    membership = data
-  }
-
-  // Fallback: get first active membership
-  if (!membership) {
-    const { data } = await supabase
-      .from('memberships')
-      .select('id, branch_id, position_id, branches(name, slug), positions(name)')
+      .select(MEMBERSHIP_COLS)
       .eq('profile_id', profileId)
       .is('ended_at', null)
       .order('assigned_at', { ascending: true })
       .limit(1)
       .single()
-    membership = data
+
+  // The profile read and the primary membership read are independent — run
+  // them concurrently. If a specific membership was requested but not found,
+  // fall back to the first active membership (rare second round-trip).
+  const primaryMembership = () =>
+    activeMembershipId
+      ? supabase
+          .from('memberships')
+          .select(MEMBERSHIP_COLS)
+          .eq('id', activeMembershipId)
+          .eq('profile_id', profileId)
+          .is('ended_at', null)
+          .single()
+      : firstActiveMembership()
+
+  const [{ data: profile }, primaryRes] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, email, full_name, avatar_url, phone, ieee_membership_id, status, bio, skills, section, created_at')
+      .eq('id', profileId)
+      .single(),
+    primaryMembership(),
+  ])
+
+  if (!profile) return null
+
+  let membership: any = primaryRes.data
+  if (!membership && activeMembershipId) {
+    membership = (await firstActiveMembership()).data
   }
 
   return {
@@ -271,38 +274,66 @@ export interface Notification {
   message: string
   link: string | null
   is_read: boolean
-  type: 'normal' | 'broadcast' | 'warning' | 'success' | 'error'
+  // `type` = visual severity; `broadcast` retained for legacy rows not yet backfilled.
+  type: 'normal' | 'info' | 'success' | 'warning' | 'error' | 'broadcast'
+  audience: 'user' | 'branch' | 'broadcast'
+  branch_id: string | null
+  event_key: string | null
   created_at: string
-  is_edited: boolean
 }
 
+// Shared column list — keeps every notification read in sync with the interface.
+const NOTIFICATION_COLUMNS = 'id, title, message, link, is_read, type, audience, branch_id, event_key, created_at'
+
+/**
+ * Personal unread notifications (drives the top-bar badge). Personal only —
+ * broadcasts are single shared rows with no per-user read state, so counting
+ * them would leave the badge permanently lit.
+ */
 export async function getUnreadNotifications(profileId: string): Promise<Notification[]> {
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, title, message, link, is_read, type, created_at, is_edited')
+    .select(NOTIFICATION_COLUMNS)
     .eq('profile_id', profileId)
     .eq('is_read', false)
     .order('created_at', { ascending: false })
     .limit(20)
 
   if (error) console.error('Error fetching unread notifications:', error)
-  return data ?? []
+  return (data ?? []) as unknown as Notification[]
 }
 
+/** The member's notification list: their personal rows plus org-wide broadcasts. */
 export async function getNotifications(profileId: string, limit = 50): Promise<Notification[]> {
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('notifications')
-    .select('id, title, message, link, is_read, type, created_at, is_edited')
-    .eq('profile_id', profileId)
+    .select(NOTIFICATION_COLUMNS)
+    .or(`profile_id.eq.${profileId},audience.eq.broadcast`)
     .order('created_at', { ascending: false })
     .limit(limit)
 
   if (error) console.error('Error fetching notifications:', error)
-  return data ?? []
+  return (data ?? []) as unknown as Notification[]
+}
+
+/** Branch-activity feed for a Chair: notifications routed to a branch. */
+export async function getBranchNotifications(branchId: string, limit = 50): Promise<Notification[]> {
+  const supabase = createAdminClient()
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .select(NOTIFICATION_COLUMNS)
+    .eq('audience', 'branch')
+    .eq('branch_id', branchId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) console.error('Error fetching branch notifications:', error)
+  return (data ?? []) as unknown as Notification[]
 }
 
 // ── Position Requests ────────────────────────────────────────
@@ -322,11 +353,6 @@ export interface PositionRequest {
   decided_by_name: string | null
   decided_at: string | null
   created_at: string
-  profile_bio: string | null
-  profile_skills: string[] | null
-  profile_phone: string | null
-  profile_section: string | null
-  profile_ieee_membership_id: string | null
 }
 
 export async function getPendingPositionRequests(): Promise<PositionRequest[]> {
@@ -337,7 +363,7 @@ export async function getPendingPositionRequests(): Promise<PositionRequest[]> {
     .select(`
       id, profile_id, status, reason, description, supporting_notes,
       admin_comment, decided_at, created_at,
-      profiles!position_requests_profile_id_fkey(full_name, email, bio, skills, phone, section, ieee_membership_id),
+      profiles!position_requests_profile_id_fkey(full_name, email),
       branches(name),
       positions(name),
       decided_by:profiles!position_requests_decided_by_fkey(full_name)
@@ -362,94 +388,6 @@ export async function getPendingPositionRequests(): Promise<PositionRequest[]> {
     decided_by_name: (r.decided_by as any)?.full_name ?? null,
     decided_at: r.decided_at,
     created_at: r.created_at,
-    profile_bio: (r.profiles as any)?.bio ?? null,
-    profile_skills: (r.profiles as any)?.skills ?? null,
-    profile_phone: (r.profiles as any)?.phone ?? null,
-    profile_section: (r.profiles as any)?.section ?? null,
-    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
-  }))
-}
-
-export async function getCancelledPositionRequests(): Promise<PositionRequest[]> {
-  const supabase = createAdminClient()
-
-  const { data } = await supabase
-    .from('position_requests')
-    .select(`
-      id, profile_id, status, reason, description, supporting_notes,
-      admin_comment, decided_at, created_at,
-      profiles!position_requests_profile_id_fkey(full_name, email, bio, skills, phone, section, ieee_membership_id),
-      branches(name),
-      positions(name),
-      decided_by:profiles!position_requests_decided_by_fkey(full_name)
-    `)
-    .eq('status', 'cancelled')
-    .order('created_at', { ascending: false })
-
-  if (!data) return []
-
-  return data.map((r) => ({
-    id: r.id,
-    profile_id: r.profile_id,
-    profile_name: (r.profiles as any)?.full_name ?? null,
-    profile_email: (r.profiles as any)?.email ?? '',
-    branch_name: (r.branches as any)?.name ?? 'Unknown',
-    position_name: (r.positions as any)?.name ?? 'Unknown',
-    status: r.status,
-    reason: r.reason,
-    description: r.description,
-    supporting_notes: r.supporting_notes,
-    admin_comment: r.admin_comment,
-    decided_by_name: (r.decided_by as any)?.full_name ?? null,
-    decided_at: r.decided_at,
-    created_at: r.created_at,
-    profile_bio: (r.profiles as any)?.bio ?? null,
-    profile_skills: (r.profiles as any)?.skills ?? null,
-    profile_phone: (r.profiles as any)?.phone ?? null,
-    profile_section: (r.profiles as any)?.section ?? null,
-    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
-  }))
-}
-
-export async function getDecidedPositionRequests(): Promise<PositionRequest[]> {
-  const supabase = createAdminClient()
-
-  const { data } = await supabase
-    .from('position_requests')
-    .select(`
-      id, profile_id, status, reason, description, supporting_notes,
-      admin_comment, decided_at, created_at,
-      profiles!position_requests_profile_id_fkey(full_name, email, bio, skills, phone, section, ieee_membership_id),
-      branches(name),
-      positions(name),
-      decided_by:profiles!position_requests_decided_by_fkey(full_name)
-    `)
-    .in('status', ['approved', 'rejected'])
-    .order('decided_at', { ascending: false })
-    .limit(50)
-
-  if (!data) return []
-
-  return data.map((r) => ({
-    id: r.id,
-    profile_id: r.profile_id,
-    profile_name: (r.profiles as any)?.full_name ?? null,
-    profile_email: (r.profiles as any)?.email ?? '',
-    branch_name: (r.branches as any)?.name ?? 'Unknown',
-    position_name: (r.positions as any)?.name ?? 'Unknown',
-    status: r.status,
-    reason: r.reason,
-    description: r.description,
-    supporting_notes: r.supporting_notes,
-    admin_comment: r.admin_comment,
-    decided_by_name: (r.decided_by as any)?.full_name ?? null,
-    decided_at: r.decided_at,
-    created_at: r.created_at,
-    profile_bio: (r.profiles as any)?.bio ?? null,
-    profile_skills: (r.profiles as any)?.skills ?? null,
-    profile_phone: (r.profiles as any)?.phone ?? null,
-    profile_section: (r.profiles as any)?.section ?? null,
-    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
   }))
 }
 
@@ -461,7 +399,7 @@ export async function getUserPositionRequests(profileId: string): Promise<Positi
     .select(`
       id, profile_id, status, reason, description, supporting_notes,
       admin_comment, decided_at, created_at,
-      profiles!position_requests_profile_id_fkey(full_name, email, bio, skills, phone, section, ieee_membership_id),
+      profiles!position_requests_profile_id_fkey(full_name, email),
       branches(name),
       positions(name),
       decided_by:profiles!position_requests_decided_by_fkey(full_name)
@@ -486,11 +424,6 @@ export async function getUserPositionRequests(profileId: string): Promise<Positi
     decided_by_name: (r.decided_by as any)?.full_name ?? null,
     decided_at: r.decided_at,
     created_at: r.created_at,
-    profile_bio: (r.profiles as any)?.bio ?? null,
-    profile_skills: (r.profiles as any)?.skills ?? null,
-    profile_phone: (r.profiles as any)?.phone ?? null,
-    profile_section: (r.profiles as any)?.section ?? null,
-    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
   }))
 }
 
@@ -525,6 +458,24 @@ export async function getPositionsForBranch(branchId: string): Promise<PositionO
     .eq('branch_id', branchId)
     .order('name')
   return data ?? []
+}
+
+/**
+ * All positions across all branches, grouped by branch id, in ONE query.
+ * Use this instead of calling getPositionsForBranch per branch (N+1).
+ */
+export async function getPositionsGroupedByBranch(): Promise<Record<string, PositionOption[]>> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('positions')
+    .select('id, name, branch_id')
+    .order('name')
+
+  const grouped: Record<string, PositionOption[]> = {}
+  for (const p of data ?? []) {
+    ;(grouped[p.branch_id] ??= []).push(p as PositionOption)
+  }
+  return grouped
 }
 
 // ── Pending Registrations ────────────────────────────────────

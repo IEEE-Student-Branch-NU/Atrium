@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
+import { notifyBroadcast, type NotificationSeverity } from '@/lib/notifications'
 
 export async function markAsRead(notificationId: string) {
   const session = await auth()
@@ -46,44 +47,22 @@ export async function sendBroadcast(formData: FormData) {
   const canBroadcast = session?.isSuperAdmin === true
   if (!canBroadcast) return { error: 'Unauthorized. Only admins can send broadcasts.' }
 
-  const supabase = createAdminClient()
-
-  const title = formData.get('title') as string
-  const message = formData.get('message') as string
-  const link = formData.get('link') as string || null
-  const type = (formData.get('type') as string) || 'broadcast'
+  const title = (formData.get('title') as string)?.trim()
+  const message = (formData.get('message') as string)?.trim()
+  const link = (formData.get('link') as string) || null
+  const rawType = (formData.get('type') as string) || 'info'
+  // Legacy 'broadcast' style value maps to the neutral 'info' severity.
+  const type = (['normal', 'info', 'success', 'warning', 'error'].includes(rawType)
+    ? rawType
+    : 'info') as NotificationSeverity
 
   if (!title || !message) {
     return { error: 'Title and message are required.' }
   }
 
-  // Get all profile IDs
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id')
+  // Single broadcast row; fanned out to every user via RLS + realtime.
+  await notifyBroadcast({ title, message, type, link, actorProfileId: session.user.id })
 
-  if (!profiles || profiles.length === 0) {
-    return { error: 'No users found.' }
-  }
-
-  // Bulk insert notifications
-  const notifications = profiles.map(p => ({
-    profile_id: p.id,
-    title,
-    message,
-    link,
-    type,
-    is_read: false
-  }))
-
-  const { error } = await supabase
-    .from('notifications')
-    .insert(notifications)
-
-  if (error) {
-    console.error('Failed to send broadcast:', error)
-    return { error: 'Failed to send broadcast.' }
-  }
-
+  revalidatePath('/notifications')
   return { success: true }
 }

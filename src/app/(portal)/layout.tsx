@@ -28,17 +28,20 @@ export default async function PortalLayout({
     ? actor.actingMembershipId
     : await getActiveWorkspace()
 
-  // Fetch profile + resolve the active workspace membership
-  const profile = await getUserProfileWithMembership(actor.actingProfileId!, activeWorkspaceId)
+  // These three reads are independent (all keyed off the acting profile) —
+  // run them concurrently instead of one-after-another. They run on every
+  // portal page, so this trims real latency off every navigation.
+  const [profile, memberships, unreadNotifications] = await Promise.all([
+    getUserProfileWithMembership(actor.actingProfileId!, activeWorkspaceId),
+    getAllUserMemberships(actor.actingProfileId!),
+    getUnreadNotifications(actor.actingProfileId!),
+  ])
 
   if (!profile) {
     redirect('/login')
   }
 
-  // Fetch ALL active memberships for the Role Switcher
-  const memberships = await getAllUserMemberships(actor.actingProfileId!)
-
-  // Fetch permissions for the active workspace
+  // Fetch permissions for the active workspace (needs the resolved profile).
   const supabase = createAdminClient()
   let permissions: string[] = []
 
@@ -51,10 +54,8 @@ export default async function PortalLayout({
     )
   }
 
-  // Fetch unread notifications count
-  const unreadNotifications = await getUnreadNotifications(actor.actingProfileId!)
-
-  // Mint a custom Supabase JWT for the client to use with Realtime
+  // Mint a custom Supabase JWT for the client to use with Realtime (CPU-only
+  // signing, not a DB round-trip — cheap to leave here).
   const supabaseToken = await createSupabaseToken(actor.actingProfileId!)
 
   const userInfo = {

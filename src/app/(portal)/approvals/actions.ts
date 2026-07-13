@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { getUserProfileWithMembership } from '@/lib/queries'
+import { notifyUser } from '@/lib/notifications'
 
 export async function approveRegistration(profileId: string) {
   const session = await auth()
@@ -20,7 +21,7 @@ export async function approveRegistration(profileId: string) {
     throw new Error('Forbidden: Missing approve_registrations permission')
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('profiles')
     .update({
       status: 'approved',
@@ -30,9 +31,20 @@ export async function approveRegistration(profileId: string) {
     })
     .eq('id', profileId)
     .eq('status', 'pending') // Double check it's still pending
+    .select('id, full_name')
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  // Only notify if a row actually transitioned from pending → approved.
+  if (updated && updated.length > 0) {
+    await notifyUser({
+      profileId,
+      event: 'registration.approved',
+      params: { name: updated[0].full_name },
+      actorProfileId: session.user.id,
+    })
   }
 
   revalidatePath('/approvals')
@@ -58,7 +70,7 @@ export async function rejectRegistration(profileId: string, reason: string) {
     throw new Error('Forbidden: Missing approve_registrations permission')
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('profiles')
     .update({
       status: 'rejected',
@@ -66,9 +78,19 @@ export async function rejectRegistration(profileId: string, reason: string) {
     })
     .eq('id', profileId)
     .eq('status', 'pending')
+    .select('id')
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  if (updated && updated.length > 0) {
+    await notifyUser({
+      profileId,
+      event: 'registration.rejected',
+      params: { reason: reason.trim() },
+      actorProfileId: session.user.id,
+    })
   }
 
   revalidatePath('/approvals')

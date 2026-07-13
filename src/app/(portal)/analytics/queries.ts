@@ -20,11 +20,14 @@ export interface RegistrationTrend {
 export async function getAnalyticsData() {
   const supabase = createAdminClient()
 
+  // The membership and profile reads are independent — fetch concurrently.
+  const [membershipsRes, profilesRes] = await Promise.all([
+    supabase.from('memberships').select('branch_id, branches(name)').is('ended_at', null),
+    supabase.from('profiles').select('status, created_at'),
+  ])
+
   // 1. Branch distribution (Members per branch)
-  const { data: activeMemberships } = await supabase
-    .from('memberships')
-    .select('branch_id, branches(name)')
-    .is('ended_at', null)
+  const activeMemberships = membershipsRes.data
 
   const branchCounts: Record<string, number> = {}
   if (activeMemberships) {
@@ -40,10 +43,8 @@ export async function getAnalyticsData() {
   }))
 
   // 2. Funnel Stats
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('status, created_at')
-  
+  const profiles = profilesRes.data
+
   const funnel: FunnelStats = {
     totalSignups: profiles?.length ?? 0,
     pending: profiles?.filter(p => p.status === 'pending').length ?? 0,

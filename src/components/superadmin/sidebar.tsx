@@ -10,6 +10,7 @@ import {
   Users,
   BadgeCheck,
   Inbox,
+  Bell,
   ScrollText,
   Settings,
   ChevronLeft,

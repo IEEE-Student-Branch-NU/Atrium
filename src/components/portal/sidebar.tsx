@@ -221,21 +221,31 @@ function RoleSwitcher({
     <div className="px-3 py-2">
       <DropdownMenu>
         <DropdownMenuTrigger render={
-          <Button
-            variant="outline"
-            className="w-full justify-between border-sidebar-border bg-sidebar-accent/30 text-sidebar-foreground hover:bg-sidebar-accent/50"
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-3 py-2 text-left cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50 hover:border-sidebar-primary/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isPending}
           />
         }>
-          <div className="flex min-w-0 flex-col items-start text-left">
-            <span className="text-xs font-semibold truncate w-full">
+          <div className="flex min-w-0 flex-col items-start">
+            <span
+              key={activeMembership?.id ?? 'none'}
+              className="text-xs font-semibold truncate w-full text-sidebar-foreground animate-in fade-in slide-in-from-left-1 duration-300"
+            >
               {activeMembership?.position_name ?? 'Member'}
             </span>
-            <span className="text-[10px] text-sidebar-foreground/50 truncate w-full">
+            <span
+              key={`branch-${activeMembership?.id ?? 'none'}`}
+              className="text-[10px] text-sidebar-foreground/50 truncate w-full animate-in fade-in slide-in-from-left-1 duration-500"
+            >
               {activeMembership?.branch_name ?? 'IEEE SBNU'}
             </span>
           </div>
-          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/40" />
+          {isPending ? (
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sidebar-foreground/40" />
+          ) : (
+            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/40 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[232px]">
           <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">

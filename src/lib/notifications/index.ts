@@ -10,7 +10,6 @@ export {
 export {
   NOTIFICATION_EVENTS,
   renderEvent,
-  eventSendsEmail,
   type NotificationEventKey,
   type NotificationParams,
   type NotificationAudience,

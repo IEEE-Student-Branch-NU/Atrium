@@ -189,7 +189,9 @@ function RoleSwitcher({
                 <ChevronsUpDown className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent side="right" align="start" className="w-64">
-                <DropdownMenuLabel>Switch Workspace</DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Switch Workspace</DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 {memberships.map((m) => (
                   <DropdownMenuItem
@@ -248,9 +250,11 @@ function RoleSwitcher({
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[232px]">
-          <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-            Switch Workspace
-          </DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+              Switch Workspace
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           {memberships.map((m) => (
             <DropdownMenuItem

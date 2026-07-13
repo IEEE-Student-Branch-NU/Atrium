@@ -69,9 +69,11 @@ export function OpenWorkspaceMenu({
         }
       />
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Choose a workspace
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            Choose a workspace
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {memberships.map((m) => (
           <DropdownMenuItem

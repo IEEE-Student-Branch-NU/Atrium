@@ -155,13 +155,6 @@ export function SendNotificationDialog({ branches, recipients }: Props) {
             <Input id="link" name="link" placeholder="e.g. /events" />
           </div>
 
-          {target !== 'broadcast' && (
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" name="email" className="h-4 w-4 rounded border-input" />
-              Also send by email
-            </label>
-          )}
-
           {error && <p className="text-sm text-destructive">{error}</p>}
           {success && <p className="text-sm text-emerald-600">Notification sent.</p>}
 

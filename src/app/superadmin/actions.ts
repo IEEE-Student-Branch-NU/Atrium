@@ -434,7 +434,6 @@ export async function sendNotification(formData: FormData) {
   const message = String(formData.get('message') ?? '').trim()
   const type = coerceSeverity(String(formData.get('type') ?? 'info'))
   const link = String(formData.get('link') ?? '').trim() || null
-  const sendEmail = String(formData.get('email') ?? '') === 'on'
 
   if (!title || !message) return { error: 'Title and message are required' }
 
@@ -443,7 +442,7 @@ export async function sendNotification(formData: FormData) {
     if (!profile_id) return { error: 'Select a user to notify' }
     await notifyCustom({
       audience: 'user', profileId: profile_id, title, message, type, link,
-      actorProfileId: session.user!.id, email: sendEmail,
+      actorProfileId: session.user!.id,
     })
   } else if (target === 'branch') {
     const branch_id = String(formData.get('branch_id') ?? '')
@@ -451,7 +450,7 @@ export async function sendNotification(formData: FormData) {
     // Free-form branch send (custom content, not a catalog event).
     await notifyCustom({
       audience: 'branch', branchId: branch_id, title, message, type, link,
-      actorProfileId: session.user!.id, email: sendEmail,
+      actorProfileId: session.user!.id,
     })
   } else {
     await notifyBroadcast({ title, message, type, link, actorProfileId: session.user!.id })
@@ -464,7 +463,7 @@ export async function sendNotification(formData: FormData) {
     entityId: session.user!.id,
     branchId: target === 'branch' ? String(formData.get('branch_id') ?? '') || null : null,
     summary: `Sent a ${target} notification: "${title}"`,
-    details: { target, type, email: sendEmail },
+    details: { target, type },
   })
 
   return { success: true }

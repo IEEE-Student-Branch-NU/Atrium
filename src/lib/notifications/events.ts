@@ -239,7 +239,4 @@ export function renderEvent(
   }
 }
 
-export function eventSendsEmail(key: NotificationEventKey): boolean {
-  const event: NotificationEvent = NOTIFICATION_EVENTS[key]
-  return event.channels.includes('email')
-}
+

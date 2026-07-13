@@ -26,8 +26,6 @@ import {
   satisfiesAudienceInvariant,
   type NotificationRow,
 } from './payload'
-import { sendEmail } from './email'
-import { renderEmail } from './templates'
 
 type Supabase = ReturnType<typeof createAdminClient>
 
@@ -41,28 +39,6 @@ async function insertRows(supabase: Supabase, rows: NotificationRow[]): Promise<
   if (valid.length === 0) return
   const { error } = await supabase.from('notifications').insert(valid)
   if (error) console.error('[notify] insert failed', error)
-}
-
-async function emailProfiles(supabase: Supabase, profileIds: string[], content: { title: string; message: string; link: string | null }): Promise<void> {
-  if (profileIds.length === 0) return
-  const { data } = await supabase.from('profiles').select('email').in('id', profileIds)
-  const emails = (data ?? []).map((r) => r.email).filter(Boolean) as string[]
-  if (emails.length === 0) return
-  const mail = renderEmail(content)
-  await sendEmail({ to: emails, subject: mail.subject, html: mail.html, text: mail.text })
-}
-
-/** Emails of the active Chairs of a branch. */
-async function branchChairEmails(supabase: Supabase, branchId: string): Promise<string[]> {
-  const { data } = await supabase
-    .from('memberships')
-    .select('profiles(email), positions!inner(name)')
-    .eq('branch_id', branchId)
-    .is('ended_at', null)
-    .eq('positions.name', 'Chair')
-  return (data ?? [])
-    .map((m) => (m.profiles as unknown as { email: string | null } | null)?.email)
-    .filter(Boolean) as string[]
 }
 
 // ── Public API ───────────────────────────────────────────────
@@ -83,14 +59,6 @@ export async function notifyUser(input: {
       branchId: input.branchId,
     })
     await insertRows(supabase, [row])
-
-    if (eventSendsEmail(input.event)) {
-      await emailProfiles(supabase, [input.profileId], {
-        title: rendered.title,
-        message: rendered.message,
-        link: rendered.link,
-      })
-    }
   } catch (err) {
     console.error('[notify] notifyUser failed', err)
   }
@@ -108,14 +76,6 @@ export async function notifyBranch(input: {
     const rendered = renderEvent(input.event, input.params)
     const row = buildBranchRow(input.branchId, rendered, { actorProfileId: input.actorProfileId })
     await insertRows(supabase, [row])
-
-    if (eventSendsEmail(input.event)) {
-      const emails = await branchChairEmails(supabase, input.branchId)
-      if (emails.length > 0) {
-        const mail = renderEmail({ title: rendered.title, message: rendered.message, link: rendered.link })
-        await sendEmail({ to: emails, subject: mail.subject, html: mail.html, text: mail.text })
-      }
-    }
   } catch (err) {
     console.error('[notify] notifyBranch failed', err)
   }
@@ -160,20 +120,6 @@ export async function notifyCustom(input: {
     const supabase = createAdminClient()
     const row = buildCustomRow(input)
     await insertRows(supabase, [row])
-
-    if (input.email && input.audience === 'user' && input.profileId) {
-      await emailProfiles(supabase, [input.profileId], {
-        title: input.title,
-        message: input.message,
-        link: input.link ?? null,
-      })
-    } else if (input.email && input.audience === 'branch' && input.branchId) {
-      const emails = await branchChairEmails(supabase, input.branchId)
-      if (emails.length > 0) {
-        const mail = renderEmail({ title: input.title, message: input.message, link: input.link ?? null })
-        await sendEmail({ to: emails, subject: mail.subject, html: mail.html, text: mail.text })
-      }
-    }
   } catch (err) {
     console.error('[notify] notifyCustom failed', err)
   }

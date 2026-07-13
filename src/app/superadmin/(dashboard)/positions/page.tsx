@@ -59,7 +59,7 @@ export default async function PositionsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <Table>
+                <Table className="table-fixed">
                   <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead className="w-[250px]">Position Name</TableHead>

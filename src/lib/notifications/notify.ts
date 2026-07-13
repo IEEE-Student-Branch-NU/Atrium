@@ -12,7 +12,6 @@ import 'server-only'
 import { createAdminClient } from '@/utils/supabase/server'
 import {
   renderEvent,
-  eventSendsEmail,
   type NotificationEventKey,
   type NotificationParams,
   type NotificationAudience,

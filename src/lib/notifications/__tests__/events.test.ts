@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   NOTIFICATION_EVENTS,
   renderEvent,
-  eventSendsEmail,
   type NotificationEventKey,
 } from '../events'
 
@@ -50,19 +49,7 @@ describe('notification event catalog', () => {
     }
   })
 
-  it('email-enabled events are exactly the high-signal subset', () => {
-    const emailKeys = KEYS.filter((k) => eventSendsEmail(k)).sort()
-    expect(emailKeys).toEqual(
-      [
-        'welcome',
-        'registration.approved',
-        'registration.rejected',
-        'position_request.approved',
-        'position_request.rejected',
-        'member.promoted',
-      ].sort(),
-    )
-  })
+
 
   it('branch-audience events carry a link into a review surface', () => {
     const submitted = renderEvent('position_request.submitted', { name: 'Asha', position: 'Chair' })

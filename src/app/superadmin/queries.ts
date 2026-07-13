@@ -543,7 +543,7 @@ export async function getAuditLog(opts: {
 
 // ── Notifications ──────────────────────────────────────────────
 
-export async function getAllNotifications(limit = 100) {
+export async function getLegacyAllNotifications(limit = 100) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('admin_notification_history')

@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
-import { getAllNotifications } from '@/app/superadmin/queries'
+import { getLegacyAllNotifications } from '@/app/superadmin/queries'
 import { NotificationsList } from './notifications-list'
 import { SendBroadcastDialog } from '@/components/superadmin/send-broadcast-dialog'
 import { createAdminClient } from '@/utils/supabase/server'
@@ -14,7 +14,7 @@ export default async function NotificationsHistoryPage() {
   if (!session?.isSuperAdmin) redirect('/login')
 
   const [notifications, branchesResult, positionsResult] = await Promise.all([
-    getAllNotifications(200),
+    getLegacyAllNotifications(200),
     createAdminClient().from('branches').select('id, name').order('name'),
     createAdminClient().from('positions').select('id, name, branch_id').order('name')
   ])

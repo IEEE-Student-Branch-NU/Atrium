@@ -32,12 +32,14 @@ export default async function NotificationsPage() {
 
   const isAdmin = session?.isSuperAdmin === true
 
+  // Combine personal and branch notifications for the legacy client UI
+  const allNotifications = [...notifications, ...branchNotifications].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+
   return (
     <NotificationsClient
-      notifications={notifications}
-      branchNotifications={branchNotifications}
-      isChair={isChair}
-      branchName={profile?.branch_name ?? null}
+      notifications={allNotifications}
       isAdmin={isAdmin}
     />
   )

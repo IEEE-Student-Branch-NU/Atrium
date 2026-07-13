@@ -343,6 +343,11 @@ export interface PositionRequest {
   profile_id: string
   profile_name: string | null
   profile_email: string
+  profile_phone?: string | null
+  profile_ieee_membership_id?: string | null
+  profile_section?: string | null
+  profile_skills?: string[] | null
+  profile_bio?: string | null
   branch_name: string
   position_name: string
   status: string
@@ -370,6 +375,78 @@ export async function getPendingPositionRequests(): Promise<PositionRequest[]> {
     `)
     .in('status', ['pending', 'under_review'])
     .order('created_at', { ascending: true })
+
+  if (!data) return []
+
+  return data.map((r) => ({
+    id: r.id,
+    profile_id: r.profile_id,
+    profile_name: (r.profiles as any)?.full_name ?? null,
+    profile_email: (r.profiles as any)?.email ?? '',
+    branch_name: (r.branches as any)?.name ?? 'Unknown',
+    position_name: (r.positions as any)?.name ?? 'Unknown',
+    status: r.status,
+    reason: r.reason,
+    description: r.description,
+    supporting_notes: r.supporting_notes,
+    admin_comment: r.admin_comment,
+    decided_by_name: (r.decided_by as any)?.full_name ?? null,
+    decided_at: r.decided_at,
+    created_at: r.created_at,
+  }))
+}
+
+export async function getCancelledPositionRequests(): Promise<PositionRequest[]> {
+  const supabase = createAdminClient()
+
+  const { data } = await supabase
+    .from('position_requests')
+    .select(`
+      id, profile_id, status, reason, description, supporting_notes,
+      admin_comment, decided_at, created_at,
+      profiles!position_requests_profile_id_fkey(full_name, email),
+      branches(name),
+      positions(name),
+      decided_by:profiles!position_requests_decided_by_fkey(full_name)
+    `)
+    .eq('status', 'cancelled')
+    .order('created_at', { ascending: false })
+
+  if (!data) return []
+
+  return data.map((r) => ({
+    id: r.id,
+    profile_id: r.profile_id,
+    profile_name: (r.profiles as any)?.full_name ?? null,
+    profile_email: (r.profiles as any)?.email ?? '',
+    branch_name: (r.branches as any)?.name ?? 'Unknown',
+    position_name: (r.positions as any)?.name ?? 'Unknown',
+    status: r.status,
+    reason: r.reason,
+    description: r.description,
+    supporting_notes: r.supporting_notes,
+    admin_comment: r.admin_comment,
+    decided_by_name: (r.decided_by as any)?.full_name ?? null,
+    decided_at: r.decided_at,
+    created_at: r.created_at,
+  }))
+}
+
+export async function getDecidedPositionRequests(): Promise<PositionRequest[]> {
+  const supabase = createAdminClient()
+
+  const { data } = await supabase
+    .from('position_requests')
+    .select(`
+      id, profile_id, status, reason, description, supporting_notes,
+      admin_comment, decided_at, created_at,
+      profiles!position_requests_profile_id_fkey(full_name, email),
+      branches(name),
+      positions(name),
+      decided_by:profiles!position_requests_decided_by_fkey(full_name)
+    `)
+    .in('status', ['approved', 'rejected'])
+    .order('decided_at', { ascending: false })
 
   if (!data) return []
 

@@ -139,9 +139,6 @@ export function NotificationsClient({
                     <Icon className={cn("h-5 w-5", style.colorClass)} />
                     <h4 className={cn("text-base font-semibold flex items-center gap-2", !notification.is_read ? "text-foreground" : "text-foreground/80")}>
                       {notification.title}
-                      {notification.is_edited && (
-                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-normal">Edited</Badge>
-                      )}
                     </h4>
                   </div>
                   <p className="text-sm text-muted-foreground/90 pl-7 sm:pl-7">

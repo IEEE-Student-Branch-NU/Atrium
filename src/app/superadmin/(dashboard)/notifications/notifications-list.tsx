@@ -35,7 +35,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { editBroadcast, deleteBroadcast } from '@/app/superadmin/actions'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
@@ -77,39 +76,7 @@ export function NotificationsList({ notifications, branches = [], positions = []
     setEditMessage(notification.message)
   }
 
-  function handleEditSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!editingBroadcast) return
-
-    startTransition(async () => {
-      const formData = new FormData()
-      formData.set('broadcast_id', editingBroadcast.broadcast_id)
-      formData.set('title', editTitle)
-      formData.set('message', editMessage)
-      formData.set('type', editType)
-
-      const result = await editBroadcast(formData)
-      if (result.error) {
-        toast.error('Failed to edit broadcast', { description: result.error })
-      } else {
-        toast.success('Broadcast updated', { description: 'The changes have been applied.' })
-        setEditingBroadcast(null)
-      }
-    })
-  }
-
-  function handleDelete(broadcast_id: string) {
-    if (!confirm('Are you sure you want to delete this broadcast? It will be removed from all users inboxes.')) return
-
-    startTransition(async () => {
-      const result = await deleteBroadcast(broadcast_id)
-      if (result.error) {
-        toast.error('Failed to delete broadcast', { description: result.error })
-      } else {
-        toast.success('Broadcast deleted')
-      }
-    })
-  }
+  // Edit and Delete functionality removed due to new unified notification system
 
   if (notifications.length === 0) {
     return (
@@ -240,24 +207,7 @@ export function NotificationsList({ notifications, branches = [], positions = []
                   </TableCell>
                   <TableCell>
                     {isBroadcast ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(n)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit Broadcast
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600 focus:text-red-600"
-                            onClick={() => handleDelete(n.broadcast_id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Broadcast
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <span className="text-muted-foreground ml-2">—</span>
                     ) : (
                       <span className="text-muted-foreground ml-2">—</span>
                     )}
@@ -270,68 +220,7 @@ export function NotificationsList({ notifications, branches = [], positions = []
       </CardContent>
     </Card>
 
-      {/* Edit Broadcast Dialog */}
-      <Dialog open={!!editingBroadcast} onOpenChange={(v) => !v && setEditingBroadcast(null)}>
-        <DialogContent>
-          <form onSubmit={handleEditSubmit}>
-            <DialogHeader>
-              <DialogTitle>Edit Broadcast</DialogTitle>
-              <DialogDescription>
-                Updates to this broadcast will instantly reflect in all recipients inboxes.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-type">Notification Type</Label>
-                <Select value={editType} onValueChange={(val) => val && setEditType(val)}>
-                  <SelectTrigger id="edit-type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="info">Info (Default)</SelectItem>
-                    <SelectItem value="success">Success</SelectItem>
-                    <SelectItem value="warning">Warning</SelectItem>
-                    <SelectItem value="error">Error</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-title">Title</Label>
-                <Input
-                  id="edit-title"
-                  required
-                  placeholder="e.g. System Maintenance"
-                  value={editTitle}
-                  onChange={e => setEditTitle(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-message">Message</Label>
-                <Textarea
-                  id="edit-message"
-                  required
-                  placeholder="Type your message here..."
-                  className="min-h-[100px]"
-                  value={editMessage}
-                  onChange={e => setEditMessage(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditingBroadcast(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Broadcast Dialog Removed */}
     </>
   )
 }

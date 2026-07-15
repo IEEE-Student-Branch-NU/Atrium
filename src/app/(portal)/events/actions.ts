@@ -3,6 +3,8 @@
 import { createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
+import { processImage } from '@/lib/images/processor'
+import { uploadToImageKit, deleteFromImageKit } from '@/lib/images/imagekit'
 
 export async function createEvent(data: any) {
   const supabase = createAdminClient()
@@ -10,10 +12,17 @@ export async function createEvent(data: any) {
   
   if (!session?.user?.id) throw new Error('Unauthorized')
     
+  const { end_date, is_free, registration_url, banner, ...rest } = data
+
+  const initialBanner = banner 
+    ? (typeof banner === 'string' ? { url: banner, end_date, is_free, registration_url } : { ...banner, end_date, is_free, registration_url }) 
+    : { end_date, is_free, registration_url }
+
   const { data: event, error } = await supabase
     .from('events')
     .insert({
-      ...data,
+      ...rest,
+      banner: initialBanner,
       creator_id: session.user.id,
       status: 'draft'
     })
@@ -21,6 +30,26 @@ export async function createEvent(data: any) {
     .single()
 
   if (error) throw error
+
+  if (banner_file) {
+    try {
+      const processed = await processImage(banner_file)
+      const folder = `/events/${event.id}/cover`
+      const uploadResult = await uploadToImageKit(folder, 'cover', processed.buffer)
+      const newBanner = { 
+        ...event.banner, 
+        url: uploadResult.url, 
+        file_id: uploadResult.fileId, 
+        width: processed.width, 
+        height: processed.height, 
+        format: processed.format 
+      }
+      await supabase.from('events').update({ banner: newBanner }).eq('id', event.id)
+    } catch (e) {
+      console.error('Failed to upload banner:', e)
+    }
+  }
+
   revalidatePath('/events')
   return event
 }
@@ -28,9 +57,53 @@ export async function createEvent(data: any) {
 export async function updateEvent(id: string, data: any) {
   const supabase = createAdminClient()
   
+  const { end_date, is_free, registration_url, banner, banner_file, ...rest } = data
+
+  let updatePayload = { ...rest }
+  const { data: existingEvent } = await supabase.from('events').select('banner').eq('id', id).single()
+  const existingBanner = existingEvent?.banner || {}
+
+  if (end_date !== undefined || is_free !== undefined || registration_url !== undefined) {
+    const newBanner = banner !== undefined 
+      ? (typeof banner === 'string' ? { url: banner, end_date, is_free, registration_url } : { ...banner, end_date, is_free, registration_url })
+      : { ...existingBanner, end_date, is_free, registration_url }
+    
+    // clean up undefined
+    if (end_date === undefined) delete newBanner.end_date
+    if (is_free === undefined) delete newBanner.is_free
+    if (registration_url === undefined) delete newBanner.registration_url
+
+    updatePayload.banner = newBanner
+  } else if (banner !== undefined) {
+    updatePayload.banner = banner
+  }
+
+  if (banner_file) {
+    try {
+      const processed = await processImage(banner_file)
+      const folder = `/events/${id}/cover`
+      const uploadResult = await uploadToImageKit(folder, 'cover', processed.buffer)
+      updatePayload.banner = { 
+        ...(updatePayload.banner || existingBanner), 
+        url: uploadResult.url, 
+        file_id: uploadResult.fileId, 
+        width: processed.width, 
+        height: processed.height, 
+        format: processed.format 
+      }
+      
+      // Delete old image if exists
+      if (existingBanner.file_id) {
+        await deleteFromImageKit(existingBanner.file_id).catch(() => {})
+      }
+    } catch (e) {
+      console.error('Failed to upload new banner:', e)
+    }
+  }
+
   const { data: event, error } = await supabase
     .from('events')
-    .update(data)
+    .update(updatePayload)
     .eq('id', id)
     .select()
     .single()

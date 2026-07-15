@@ -17,6 +17,7 @@ import {
   X,
   Clock,
   AlertCircle,
+  Hash,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { updateProfile, changePassword, requestPosition } from './actions'
+import { updateProfile, changePassword, requestPosition, updateMembershipDetails } from './actions'
 import { switchWorkspace } from '@/app/(portal)/actions'
 import type { FullUserProfile, PositionRequest, BranchOption, PositionOption } from '@/lib/queries'
 
@@ -147,6 +148,79 @@ function EditProfileDialog({ profile }: { profile: FullUserProfile }) {
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Edit Membership Details Dialog ───────────────────────────
+
+function EditMembershipDialog({ profile }: { profile: FullUserProfile }) {
+  const [open, setOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  function handleSubmit(formData: FormData) {
+    setError(null)
+    setSuccess(false)
+    startTransition(async () => {
+      const result = await updateMembershipDetails(formData)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setSuccess(true)
+        setTimeout(() => setOpen(false), 1500)
+      }
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); setError(null); setSuccess(false) }}>
+      <DialogTrigger render={<Button variant="outline" size="sm" className="gap-2" />}>
+        <Edit3 className="h-3.5 w-3.5" />
+        Edit Membership
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Membership Details</DialogTitle>
+          <DialogDescription>Update your IEEE membership ID.</DialogDescription>
+        </DialogHeader>
+        {!profile.has_password ? (
+          <div className="space-y-4">
+            <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-4">
+              <div className="flex gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+                <div className="text-sm text-amber-800 dark:text-amber-300">
+                  <p className="font-semibold mb-1">Password Required</p>
+                  <p>You must set a password for your account before you can edit your membership details. Please use the Security section to set a password first.</p>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" onClick={() => setOpen(false)}>Close</Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <form action={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="ieeeMembershipId">IEEE Membership ID</Label>
+              <Input id="ieeeMembershipId" name="ieeeMembershipId" defaultValue={profile.ieee_membership_id ?? ''} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Current Password (Required)</Label>
+              <Input id="currentPassword" name="currentPassword" type="password" required />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            {success && <p className="text-sm text-emerald-600">Membership details updated successfully!</p>}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -418,6 +492,39 @@ export function ProfileClient({
               }>
                 {profile.status.charAt(0).toUpperCase() + profile.status.slice(1)}
               </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Membership Details */}
+      <div id="membership">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold">Membership Details</h3>
+            <p className="text-sm text-muted-foreground">Your IEEE membership information</p>
+          </div>
+          <EditMembershipDialog profile={profile} />
+        </div>
+        <Card className="border-border/50 bg-card/50">
+          <CardContent className="p-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-muted-foreground">IEEE Membership ID</p>
+              <div className="flex items-center gap-2 mt-1">
+                <Hash className="h-4 w-4 text-muted-foreground shrink-0" />
+                <p className="font-mono text-sm">{profile.ieee_membership_id || 'Not set'}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Membership Expiry</p>
+              <div className="flex items-center gap-2 mt-1">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <p className="text-sm">
+                  {profile.membership_expiry 
+                    ? new Date(profile.membership_expiry).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', day: 'numeric' }) 
+                    : 'Not set'}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

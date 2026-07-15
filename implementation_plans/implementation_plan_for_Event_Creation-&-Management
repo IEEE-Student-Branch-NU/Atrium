@@ -1,0 +1,105 @@
+# Implementation Plan
+
+## Goal Description
+Implement the Event Creation and Approval System for the IEEE SBNU Event Creation Portal. This includes the UI for creating events, a multi-state event workflow (draft, pending, approved, published, completed), a streamlined branch-level approval system, post-event image gallery uploads via Web Workers, organizer assignments, and automated notifications.
+
+## User Review Required
+> [!IMPORTANT]
+> - Is ImageKit already configured in the environment? We will need `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY`, `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` and `IMAGEKIT_PRIVATE_KEY` in `.env.local` for uploads to work.
+> - For "Upcoming Event" notifications, do we have a cron job setup (like Vercel Cron) to trigger the upcoming event checks daily, or should this be evaluated on the fly?
+
+## Proposed Changes
+
+### 1. Database Schema Additions & Modifications
+Update the existing schema to accommodate the new features.
+
+#### [NEW MIGRATION] `supabase/migrations/00014_event_management_extensions.sql`
+- **Enums**: Alter `event_status` to add `'completed'`.
+- **Table `event_organizers`**:
+  - Columns: `id`, `event_id` (FK), `profile_id` (FK), `assigned_by` (FK), `created_at`.
+  - Purpose: Allow Superadmins/Admins to assign multiple organizers to an event.
+- **Table `event_gallery_images`**:
+  - Columns: `id`, `event_id` (FK), `imagekit_url`, `imagekit_file_id`, `uploaded_at`.
+  - Purpose: Store bulk post-event images.
+- **Action**: Run `supabase gen types typescript` after applying migrations.
+
+---
+
+### 2. Backend API & Server Actions
+Extend actions to handle the new capabilities.
+
+#### [NEW] `src/app/(portal)/events/actions.ts`
+- `createEvent(data)` / `updateEvent(id, data)` / `deleteEvent(id)`: Base CRUD operations.
+- `submitEvent(id)`: Update status to 'pending_approval'. Triggers notification to Branch Admins.
+- `approveEvent(id, comment)`: **Approval limited to Branch Level only.** Updates status to 'approved' and subsequently 'published'. Triggers notification to the creator.
+- `rejectEvent(id, comment)`: Updates status to 'rejected'. Triggers notification to the creator.
+- `assignOrganizer(eventId, profileId)`: Allows Admins/Superadmins to add members to `event_organizers`.
+- `completeEvent(id, postEventData)`: Marks an event as 'completed'. Allows attaching final remarks or attendee counts.
+- `getCompletedEvents()`: API to fetch past event data for analytics or records.
+
+#### [NEW] `src/app/api/events/[id]/gallery/route.ts`
+- `POST`: Secure endpoint for the Web Worker to register successfully uploaded ImageKit images into the `event_gallery_images` table.
+
+#### [NEW] `src/app/api/imagekit/auth/route.ts`
+- `GET`: Generates ImageKit authentication parameters (token, expire, signature) for secure client-side/worker-side uploads.
+
+#### [NEW] `src/app/api/public/events/route.ts`
+- `GET`: Public API to expose published and completed events to the main `ieeenirma.org` website.
+- **Features**: Supports filtering by branch, date range, status, and pagination. Configured with proper CORS headers to allow cross-origin requests from the main website.
+
+---
+
+### 3. Post-Event Gallery Uploads (Web Worker)
+Implement a non-blocking background uploader for large numbers of images.
+
+#### [NEW] `public/workers/image-uploader.js`
+- A standard Web Worker that receives a list of file chunks.
+- Requests ImageKit auth tokens from `/api/imagekit/auth`.
+- Uploads images directly to ImageKit's API.
+- Posts progress back to the main thread (UI).
+- On success, hits `/api/events/[id]/gallery` to save the URLs in the database.
+
+#### [NEW] `src/components/events/post-event-gallery-upload.tsx`
+- UI component to select multiple images.
+- Spawns the Web Worker, passes the files, and displays a progress bar for the background upload, allowing the user to continue navigating the app.
+
+---
+
+### 4. Notifications System Integration
+Utilize the existing `notifications` and `broadcast_notifications` tables.
+
+#### [MODIFY] Event Actions to Trigger Notifications
+- **Event Approval Request**: When `submitEvent` is called, insert a `warning` notification for all profiles having the Admin role in that specific branch.
+- **Event Created/Approved/Rejected**: Insert `success` or `error` notifications targeting the event creator's `profile_id`.
+- **Upcoming Event**: Create an API route `GET /api/cron/upcoming-events` (secured by a cron secret) that finds events occurring in the next 24 hours and inserts `normal` notifications for branch members.
+
+---
+
+### 5. Frontend - Event Management UI
+
+#### [NEW] `src/app/(portal)/events/[id]/page.tsx`
+- **Organizers Section**: Visible to Admins/Superadmins. Contains a combobox to search members and assign them to the event.
+- **Completion Section**: Button to "Mark as Completed", which becomes available after the event date passes.
+- **Gallery Section**: Shows the `post-event-gallery-upload` component and a grid of existing uploaded images.
+
+#### [NEW] `src/app/(portal)/approvals/page.tsx`
+- Queue for events needing approval.
+- **Logic**: Filters for events in the current user's branch (or all branches for Superadmin). A single click approves the event for the whole branch.
+
+---
+
+## Verification Plan
+
+### Manual Verification
+- **Event Creation & Approval**:
+  - Creator submits event -> Admins receive notification.
+  - Admin approves -> Creator receives notification, event becomes 'published'.
+- **Superadmin Assignment**:
+  - Superadmin assigns another member to the event. Verify the member appears in the organizers list and gains edit rights for that event.
+- **Post-Event Gallery (Web Worker)**:
+  - Mark event as completed.
+  - Select 10+ images to upload.
+  - Verify the UI remains responsive and progress updates correctly from the background worker.
+  - Verify images appear in the DB and ImageKit dashboard.
+- **Upcoming Events Cron**:
+  - Manually trigger the cron endpoint and verify users receive the upcoming event notification.

@@ -1,12 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Mail, Phone, Hash, Calendar, Building2, Briefcase, BookOpen, Sparkles } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, Hash, Calendar, Building2, Briefcase, BookOpen, Sparkles, Pencil, MoreVertical } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import type { FullUserProfile } from '@/lib/queries'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import type { FullUserProfile, DirectoryMember } from '@/lib/queries'
+import { EditExpiryModal } from '../EditExpiryModal'
 
 function getInitials(name: string | null): string {
   if (!name) return '?'
@@ -18,23 +21,43 @@ function getInitials(name: string | null): string {
     .slice(0, 2)
 }
 
-export function MemberProfileView({ profile }: { profile: FullUserProfile }) {
+export function MemberProfileView({ profile, canViewPrivateDetails = false }: { profile: FullUserProfile, canViewPrivateDetails?: boolean }) {
+  const [isEditExpiryOpen, setIsEditExpiryOpen] = useState(false)
   const activeMemberships = profile.memberships.filter(m => m.is_active)
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Back button */}
-      <Link href="/members">
-        <Button variant="ghost" size="sm" className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Members
-        </Button>
-      </Link>
+      <div>
+        <Link href="/members">
+          <Button variant="ghost" size="sm" className="gap-2 -ml-3 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Members
+          </Button>
+        </Link>
+      </div>
 
       {/* Profile Header Card */}
-      <Card>
+      <Card className="relative">
+        {canViewPrivateDetails && (
+          <div className="absolute top-4 right-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setIsEditExpiryOpen(true)} className="cursor-pointer">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Edit Expiry Date
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
         <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row items-start gap-5">
+          <div className="flex flex-col sm:flex-row items-start gap-5 pr-10">
             <Avatar className="h-20 w-20 shrink-0">
               <AvatarImage src={profile.avatar_url ?? undefined} alt={profile.full_name ?? ''} />
               <AvatarFallback className="text-xl font-semibold bg-primary/10 text-primary">
@@ -78,10 +101,35 @@ export function MemberProfileView({ profile }: { profile: FullUserProfile }) {
                     <span>{profile.phone}</span>
                   </div>
                 )}
-                {profile.ieee_membership_id && (
+                {profile.ieee_membership_id && canViewPrivateDetails && (
                   <div className="flex items-center gap-2">
                     <Hash className="h-3.5 w-3.5 shrink-0" />
                     <span className="font-mono">IEEE: {profile.ieee_membership_id}</span>
+                  </div>
+                )}
+                {canViewPrivateDetails && (
+                  <div className="flex items-center gap-2 group">
+                    <Calendar className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Expiry:{' '}
+                      {profile.membership_expiry ? (
+                        new Date(profile.membership_expiry).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', day: 'numeric' })
+                      ) : (
+                        <span className="text-destructive font-medium cursor-pointer hover:underline" onClick={() => setIsEditExpiryOpen(true)}>
+                          Set Expiry Date
+                        </span>
+                      )}
+                    </span>
+                    {profile.membership_expiry && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setIsEditExpiryOpen(true)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 )}
                 {profile.section && (
@@ -176,6 +224,14 @@ export function MemberProfileView({ profile }: { profile: FullUserProfile }) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {canViewPrivateDetails && (
+        <EditExpiryModal
+          member={profile as unknown as DirectoryMember}
+          isOpen={isEditExpiryOpen}
+          onClose={() => setIsEditExpiryOpen(false)}
+        />
       )}
     </div>
   )

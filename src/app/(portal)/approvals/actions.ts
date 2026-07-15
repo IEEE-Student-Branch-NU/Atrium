@@ -21,23 +21,31 @@ export async function approveRegistration(profileId: string) {
     throw new Error('Forbidden: Missing approve_registrations permission')
   }
 
+  // Check branch scope
+  if (!permissions.includes('*')) {
+    const { data: mems } = await supabase.from('memberships').select('branch_id').eq('profile_id', profileId)
+    const hasBranch = mems?.some(m => m.branch_id === profile.branch_id)
+    if (!hasBranch) throw new Error('Forbidden: You can only manage members of your own branch.')
+  }
+
   const { data: updated, error } = await supabase
     .from('profiles')
     .update({
       status: 'approved',
       approved_by: session.user.id,
+      approved_by_position: profile.position_name || (session.isSuperAdmin ? 'Superadmin' : 'Admin'), // Store the active position name or fallback to Superadmin
       approved_at: new Date().toISOString(),
       rejected_reason: null, // Clear any past rejection
     })
+    .in('status', ['pending', 'under_review']) // Allow approving from pending or under_review
     .eq('id', profileId)
-    .eq('status', 'pending') // Double check it's still pending
     .select('id, full_name')
 
   if (error) {
     throw new Error(error.message)
   }
 
-  // Only notify if a row actually transitioned from pending → approved.
+  // Only notify if a row actually transitioned.
   if (updated && updated.length > 0) {
     await notifyUser({
       profileId,
@@ -46,6 +54,40 @@ export async function approveRegistration(profileId: string) {
       actorProfileId: session.user.id,
     })
   }
+
+  revalidatePath('/approvals')
+  revalidatePath('/')
+  return { success: true }
+}
+
+export async function markUnderReview(profileId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Unauthorized')
+
+  const profile = await getUserProfileWithMembership(session.user.id)
+  if (!profile) throw new Error('Unauthorized')
+
+  const supabase = createAdminClient()
+  const permissions = await getUserPermissions(supabase, profile.id, profile.branch_id ?? '')
+  
+  if (!hasPermission(permissions, 'approve_registrations')) {
+    throw new Error('Forbidden: Missing approve_registrations permission')
+  }
+
+  // Check branch scope
+  if (!permissions.includes('*')) {
+    const { data: mems } = await supabase.from('memberships').select('branch_id').eq('profile_id', profileId)
+    const hasBranch = mems?.some(m => m.branch_id === profile.branch_id)
+    if (!hasBranch) throw new Error('Forbidden: You can only manage members of your own branch.')
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ status: 'under_review' })
+    .eq('id', profileId)
+    .eq('status', 'pending')
+
+  if (error) throw new Error(error.message)
 
   revalidatePath('/approvals')
   revalidatePath('/')
@@ -70,15 +112,22 @@ export async function rejectRegistration(profileId: string, reason: string) {
     throw new Error('Forbidden: Missing approve_registrations permission')
   }
 
+  // Check branch scope
+  if (!permissions.includes('*')) {
+    const { data: mems } = await supabase.from('memberships').select('branch_id').eq('profile_id', profileId)
+    const hasBranch = mems?.some(m => m.branch_id === profile.branch_id)
+    if (!hasBranch) throw new Error('Forbidden: You can only manage members of your own branch.')
+  }
+
   const { data: updated, error } = await supabase
     .from('profiles')
     .update({
       status: 'rejected',
       rejected_reason: reason.trim(),
     })
+    .in('status', ['pending', 'under_review']) // Allow rejecting from pending or under_review
     .eq('id', profileId)
-    .eq('status', 'pending')
-    .select('id')
+    .select('id, full_name')
 
   if (error) {
     throw new Error(error.message)

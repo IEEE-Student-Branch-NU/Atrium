@@ -42,11 +42,11 @@ export function MemberProfileView({ profile, canViewPrivateDetails = false }: { 
         {canViewPrivateDetails && (
           <div className="absolute top-4 right-4">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+              <DropdownMenuTrigger render={
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground/70 hover:text-foreground">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
-              </DropdownMenuTrigger>
+              } />
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setIsEditExpiryOpen(true)} className="cursor-pointer">
                   <Calendar className="mr-2 h-4 w-4" />

@@ -112,11 +112,11 @@ export default async function RejectedPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Button asChild className="w-full">
-                <Link href="/complete-registration">
+              <Link href="/complete-registration" className="w-full">
+                <Button className="w-full">
                   Update Details & Reapply
-                </Link>
-              </Button>
+                </Button>
+              </Link>
               <form action={signOut}>
                 <Button variant="outline" type="submit" className="w-full">
                   Sign Out

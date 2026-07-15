@@ -632,7 +632,7 @@ export async function getApprovalHistory(limit = 50, branchId?: string): Promise
 
   const { data } = await query
 
-  return (data ?? []).map((item) => ({
+  return ((data as any[]) ?? []).map((item) => ({
     id: item.id,
     full_name: item.full_name,
     email: item.email,

@@ -12,7 +12,7 @@ export async function createEvent(data: any) {
   
   if (!session?.user?.id) throw new Error('Unauthorized')
     
-  const { end_date, is_free, registration_url, banner, ...rest } = data
+  const { end_date, is_free, registration_url, banner, banner_file, ...rest } = data
 
   const initialBanner = banner 
     ? (typeof banner === 'string' ? { url: banner, end_date, is_free, registration_url } : { ...banner, end_date, is_free, registration_url }) 

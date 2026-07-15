@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
+import { auth } from '@/auth'
 
 export async function POST(
   request: Request,
@@ -14,12 +15,13 @@ export async function POST(
       return NextResponse.json({ error: 'No images provided' }, { status: 400 })
     }
 
-    const supabase = createClient()
-    const { data: userData, error: userError } = await supabase.auth.getUser()
+    const session = await auth()
 
-    if (userError || !userData?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const supabase = createAdminClient()
 
     // Insert all images into event_gallery_images
     const rowsToInsert = images.map((img: any) => ({
@@ -50,7 +52,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = createClient()
+    const supabase = createAdminClient()
     
     const { data, error } = await supabase
       .from('event_gallery_images')

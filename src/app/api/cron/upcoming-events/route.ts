@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY! // Need service role to bypass RLS for cron
-
 export async function GET(request: Request) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
     const authHeader = request.headers.get('Authorization')
     const expectedAuth = `Bearer ${process.env.CRON_SECRET}`
 
@@ -47,12 +47,18 @@ export async function GET(request: Request) {
 
       if (membersError || !members) continue
 
-      const notifications = members.map(member => ({
-        profile_id: member.profile_id,
-        title: 'Upcoming Event Reminder',
-        message: `The event "${event.name}" by ${event.branches?.name} is happening within 24 hours!`,
-        type: 'normal'
-      }))
+      const notifications = members.map(member => {
+        const branchName = Array.isArray(event.branches) 
+          ? event.branches[0]?.name 
+          : (event.branches as any)?.name
+          
+        return {
+          profile_id: member.profile_id,
+          title: 'Upcoming Event Reminder',
+          message: `The event "${event.name}" by ${branchName || 'your branch'} is happening within 24 hours!`,
+          type: 'normal'
+        }
+      })
 
       if (notifications.length > 0) {
         const { error: notifyError } = await supabase.from('notifications').insert(notifications)

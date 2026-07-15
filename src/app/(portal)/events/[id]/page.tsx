@@ -1,8 +1,9 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { PostEventGalleryUpload } from '@/components/events/post-event-gallery-upload'
 import { completeEvent } from '../actions'
+import { auth } from '@/auth'
 
 interface EventPageProps {
   params: Promise<{ id: string }>
@@ -10,11 +11,11 @@ interface EventPageProps {
 
 export default async function EventPage({ params }: EventPageProps) {
   const { id } = await params
-  const supabase = createClient()
+  const supabase = createAdminClient()
 
   // Get user session
-  const { data: userData } = await supabase.auth.getUser()
-  if (!userData?.user) redirect('/login')
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   // Fetch event details
   const { data: event, error } = await supabase
@@ -36,13 +37,13 @@ export default async function EventPage({ params }: EventPageProps) {
   const { data: membership } = await supabase
     .from('memberships')
     .select('portal_role')
-    .eq('profile_id', userData.user.id)
+    .eq('profile_id', session.user.id)
     .eq('branch_id', event.branch_id)
     .is('ended_at', null)
     .single()
 
   const isAdmin = membership?.portal_role === 'admin' || membership?.portal_role === 'super_admin'
-  const isCreator = event.creator_id === userData.user.id
+  const isCreator = event.creator_id === session.user.id
   const canEdit = isAdmin || isCreator
 
   const eventDate = new Date(event.event_date)
@@ -80,7 +81,6 @@ export default async function EventPage({ params }: EventPageProps) {
         <div className="border rounded-lg p-6 bg-card text-card-foreground">
           <h2 className="text-xl font-semibold mb-4">Event Organizers</h2>
           <p className="text-sm text-muted-foreground mb-4">Assign members to help organize this event.</p>
-          {/* Organizer assignment UI would go here */}
           <div className="text-sm border p-4 rounded-md">
             Assign Organizer component coming soon...
           </div>

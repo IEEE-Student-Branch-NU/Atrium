@@ -1,21 +1,22 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { approveEvent, rejectEvent } from '../actions'
 import Link from 'next/link'
+import { auth } from '@/auth'
 
 export default async function EventApprovalsPage() {
-  const supabase = createClient()
+  const supabase = createAdminClient()
 
   // Get user session
-  const { data: userData } = await supabase.auth.getUser()
-  if (!userData?.user) redirect('/login')
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   // Get user's memberships to check admin roles
   const { data: memberships } = await supabase
     .from('memberships')
     .select('branch_id, portal_role, branches(name)')
-    .eq('profile_id', userData.user.id)
+    .eq('profile_id', session.user.id)
     .is('ended_at', null)
 
   const adminMemberships = memberships?.filter(

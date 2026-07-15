@@ -1,19 +1,20 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { auth } from '@/auth'
 
 export async function createEvent(data: any) {
-  const supabase = createClient()
+  const supabase = createAdminClient()
+  const session = await auth()
   
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError || !userData?.user) throw new Error('Unauthorized')
+  if (!session?.user?.id) throw new Error('Unauthorized')
     
   const { data: event, error } = await supabase
     .from('events')
     .insert({
       ...data,
-      creator_id: userData.user.id,
+      creator_id: session.user.id,
       status: 'draft'
     })
     .select()
@@ -25,7 +26,7 @@ export async function createEvent(data: any) {
 }
 
 export async function updateEvent(id: string, data: any) {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   
   const { data: event, error } = await supabase
     .from('events')
@@ -41,7 +42,7 @@ export async function updateEvent(id: string, data: any) {
 }
 
 export async function deleteEvent(id: string) {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   
   const { error } = await supabase
     .from('events')
@@ -53,7 +54,7 @@ export async function deleteEvent(id: string) {
 }
 
 export async function submitEvent(id: string) {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   
   const { data: event, error } = await supabase
     .from('events')
@@ -88,8 +89,8 @@ export async function submitEvent(id: string) {
 }
 
 export async function approveEvent(id: string, comment?: string) {
-  const supabase = createClient()
-  const { data: userData } = await supabase.auth.getUser()
+  const supabase = createAdminClient()
+  const session = await auth()
   
   const { data: event, error } = await supabase
     .from('events')
@@ -100,11 +101,11 @@ export async function approveEvent(id: string, comment?: string) {
 
   if (error) throw error
   
-  if (userData?.user) {
+  if (session?.user?.id) {
     await supabase.from('event_approvals').insert({
       event_id: id,
       level: 1,
-      approver_id: userData.user.id,
+      approver_id: session.user.id,
       decision: 'approved',
       comment
     })
@@ -124,8 +125,8 @@ export async function approveEvent(id: string, comment?: string) {
 }
 
 export async function rejectEvent(id: string, comment?: string) {
-  const supabase = createClient()
-  const { data: userData } = await supabase.auth.getUser()
+  const supabase = createAdminClient()
+  const session = await auth()
   
   const { data: event, error } = await supabase
     .from('events')
@@ -136,11 +137,11 @@ export async function rejectEvent(id: string, comment?: string) {
 
   if (error) throw error
 
-  if (userData?.user) {
+  if (session?.user?.id) {
     await supabase.from('event_approvals').insert({
       event_id: id,
       level: 1,
-      approver_id: userData.user.id,
+      approver_id: session.user.id,
       decision: 'rejected',
       comment
     })
@@ -160,15 +161,15 @@ export async function rejectEvent(id: string, comment?: string) {
 }
 
 export async function assignOrganizer(eventId: string, profileId: string) {
-  const supabase = createClient()
-  const { data: userData } = await supabase.auth.getUser()
+  const supabase = createAdminClient()
+  const session = await auth()
   
   const { data, error } = await supabase
     .from('event_organizers')
     .insert({
       event_id: eventId,
       profile_id: profileId,
-      assigned_by: userData?.user?.id
+      assigned_by: session?.user?.id
     })
     .select()
     .single()
@@ -179,7 +180,7 @@ export async function assignOrganizer(eventId: string, profileId: string) {
 }
 
 export async function completeEvent(id: string, postEventData?: any) {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   
   const { data: event, error } = await supabase
     .from('events')
@@ -195,7 +196,7 @@ export async function completeEvent(id: string, postEventData?: any) {
 }
 
 export async function getCompletedEvents() {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   
   const { data, error } = await supabase
     .from('events')

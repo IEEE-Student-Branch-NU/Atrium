@@ -3,13 +3,12 @@ import { createClient } from '@supabase/supabase-js'
 
 // We use an admin or anon client for the public API, depending on RLS.
 // Since it's a public API, we can use the anon key.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
 export async function GET(request: Request) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
     const { searchParams } = new URL(request.url)
     
     const branch = searchParams.get('branch')

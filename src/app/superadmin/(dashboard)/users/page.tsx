@@ -142,6 +142,7 @@ export default async function UsersPage({
                     <TableHead>Email</TableHead>
                     <TableHead>IEEE ID</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -161,6 +162,11 @@ export default async function UsersPage({
                       </TableCell>
                       <TableCell>
                         <Badge variant={statusVariant(u.status)}>{u.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" render={<Link href={`/superadmin/users/${u.id}`} />}>
+                          Manage
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

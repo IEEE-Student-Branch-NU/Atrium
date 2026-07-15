@@ -38,6 +38,15 @@ export async function getUserPermissions(
 
   const permissionNames: string[] = []
 
+  // Direct grants are independent of the position lookup below — start the
+  // query now and await it at the end so the two round-trips overlap.
+  const directPermsPromise = supabase
+    .from('member_permissions')
+    .select('permission_id, permissions!inner(name)')
+    .eq('profile_id', profileId)
+    .eq('branch_id', branchId)
+    .is('revoked_at', null)
+
   // 2. Get position-based permissions
   if (membershipId) {
     // Workspace-scoped: only the active membership's position
@@ -96,13 +105,8 @@ export async function getUserPermissions(
     }
   }
 
-  // 3. Get direct permission grants (always branch-scoped)
-  const { data: directPerms } = await supabase
-    .from('member_permissions')
-    .select('permission_id, permissions!inner(name)')
-    .eq('profile_id', profileId)
-    .eq('branch_id', branchId)
-    .is('revoked_at', null)
+  // 3. Direct permission grants (kicked off above; await the result now).
+  const { data: directPerms } = await directPermsPromise
 
   if (directPerms) {
     for (const dp of directPerms) {

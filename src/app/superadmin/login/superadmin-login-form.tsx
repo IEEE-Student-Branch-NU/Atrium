@@ -39,19 +39,21 @@ export function SuperadminLoginForm() {
 
         <form action={action} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="username">Username</Label>
             <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="admin@nirmauni.ac.in"
+              id="username"
+              name="username"
+              type="text"
+              placeholder="Enter your username"
               required
-              autoComplete="email"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               className="focus-visible:ring-destructive"
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="password">Passphrase</Label>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               name="password"

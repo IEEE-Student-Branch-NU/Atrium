@@ -446,10 +446,10 @@ export function ProfileClient({
             {activePositions.map((m) => (
               <Card
                 key={m.id}
-                className={`border-border/50 transition-all ${
+                className={`border-border/50 transition-all duration-200 hover:shadow-md hover:border-border/80 ${
                   m.id === activeMembershipId
-                    ? 'ring-2 ring-sidebar-primary/50 bg-sidebar-primary/5'
-                    : 'bg-card/50'
+                    ? 'ring-2 ring-sidebar-primary/50 bg-sidebar-primary/5 cursor-default'
+                    : 'bg-card/50 cursor-pointer hover:bg-card/80'
                 }`}
               >
                 <CardContent className="p-4">
@@ -477,7 +477,7 @@ export function ProfileClient({
 
                   {m.id !== activeMembershipId && (
                     <form action={async () => { await switchWorkspace(m.id) }} className="mt-3">
-                      <Button variant="outline" size="sm" type="submit" className="w-full h-8 text-xs">
+                      <Button variant="outline" size="sm" type="submit" className="w-full h-8 text-xs cursor-pointer hover:bg-sidebar-primary/10 hover:text-sidebar-primary hover:border-sidebar-primary/30 transition-all duration-200 active:scale-[0.98]">
                         Switch to Workspace
                       </Button>
                     </form>

@@ -1,12 +1,14 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, Bell } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -47,8 +49,20 @@ export function SuperAdminTopBar({ user, title }: SuperAdminTopBarProps) {
         </h1>
       </div>
 
-      {/* Right: Theme Toggle + User Menu */}
+      {/* Right: Notifications + Theme Toggle + User Menu */}
       <div className="flex items-center gap-2">
+        {/* Notifications */}
+        <Link href="/superadmin/notifications">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative h-9 w-9 text-muted-foreground hover:text-foreground"
+          >
+            <Bell className="h-4 w-4" />
+            <span className="sr-only">Notifications</span>
+          </Button>
+        </Link>
+
         {/* Theme Toggle */}
         <Button
           variant="ghost"
@@ -77,12 +91,14 @@ export function SuperAdminTopBar({ user, title }: SuperAdminTopBarProps) {
             </span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user.name ?? 'Super Admin'}</p>
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-              </div>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{user.name ?? 'Super Admin'}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <form action={signOut} className="w-full">

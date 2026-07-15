@@ -3,7 +3,12 @@ import { auth } from '@/auth'
 import { getEffectiveActor } from '@/utils/auth/superadmin'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
-import { getUserProfileWithMembership, getPendingPositionRequests } from '@/lib/queries'
+import { 
+  getUserProfileWithMembership, 
+  getPendingPositionRequests, 
+  getCancelledPositionRequests, 
+  getDecidedPositionRequests 
+} from '@/lib/queries'
 import { getActiveWorkspace } from '@/utils/auth/workspace'
 import { PositionRequestsClient } from './client'
 
@@ -30,15 +35,26 @@ export default async function PositionRequestsPage() {
     redirect('/')
   }
 
-  // Fetch pending requests. 
+  // Fetch requests. 
   // Ideally, this should be filtered by branch if the user is not superadmin.
-  // For now, getPendingPositionRequests fetches all, we'll filter on the client or here.
-  let requests = await getPendingPositionRequests()
+  let [pending, cancelled, decided] = await Promise.all([
+    getPendingPositionRequests(),
+    getCancelledPositionRequests(),
+    getDecidedPositionRequests()
+  ])
 
   // Filter if not superadmin (or wildcard perms)
   if (!permissions.includes('*')) {
-    requests = requests.filter(req => req.branch_name === profile.branch_name)
+    pending = pending.filter(req => req.branch_name === profile.branch_name)
+    cancelled = cancelled.filter(req => req.branch_name === profile.branch_name)
+    decided = decided.filter(req => req.branch_name === profile.branch_name)
   }
 
-  return <PositionRequestsClient requests={requests} />
+  return (
+    <PositionRequestsClient 
+      requests={pending} 
+      cancelledRequests={cancelled} 
+      decidedRequests={decided} 
+    />
+  )
 }

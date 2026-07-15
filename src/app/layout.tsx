@@ -8,6 +8,19 @@ export const metadata: Metadata = {
   title: "Atrium | IEEE SBNU Portal",
   description:
     "Internal management portal for IEEE Student Branch of Nirma University. Event creation, membership management, and approval workflows.",
+  openGraph: {
+    title: "Atrium | IEEE SBNU Portal",
+    description: "Internal management portal for IEEE Student Branch of Nirma University.",
+    url: "https://atrium.ieeesbnu.org",
+    siteName: "Atrium",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Atrium | IEEE SBNU Portal",
+    description: "Internal management portal for IEEE Student Branch of Nirma University.",
+  },
 };
 
 export default function RootLayout({

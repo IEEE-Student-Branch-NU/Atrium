@@ -6,9 +6,17 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { getAllBranches } from '@/lib/queries'
 import { listPositionsGrouped, getAllPermissions } from '@/app/superadmin/queries'
-import { CreatePositionForm, PositionCard } from './position-controls'
+import { CreatePositionForm, PositionRow } from './position-controls'
 
 // ── Page ─────────────────────────────────────────────────────
 
@@ -50,16 +58,25 @@ export default async function PositionsPage() {
                   {group.positions.length} position{group.positions.length === 1 ? '' : 's'}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="divide-y divide-border/50 rounded-md border">
-                  {group.positions.map((position) => (
-                    <PositionCard
-                      key={position.id}
-                      position={position}
-                      allPermissions={permissions}
-                    />
-                  ))}
-                </div>
+              <CardContent className="p-0">
+                <Table className="table-fixed">
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[250px]">Position Name</TableHead>
+                      <TableHead>Permissions</TableHead>
+                      <TableHead className="w-[200px] text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.positions.map((position) => (
+                      <PositionRow
+                        key={position.id}
+                        position={position}
+                        allPermissions={permissions}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           ))}

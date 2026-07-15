@@ -1,6 +1,6 @@
 # IEEE SBNU Event Creation Portal — Database Schema (v2)
 
-> **Last Updated:** July 2026 | **Migrations:** `00001_initial_schema.sql` through `00008_audit_log.sql` (see [§10 Migration History](#10-migration-history) for the full list)
+> **Last Updated:** July 2026 | **Migrations:** `00001_initial_schema.sql` through `00011_notification_routing.sql` (see [§10 Migration History](#10-migration-history) for the full list)
 
 This document is the single source of truth for the database architecture. It covers every table, enum, trigger, index, and seed record — along with the reasoning behind each decision. Written for future team members to read, review, and tweak.
 
@@ -494,23 +494,27 @@ Immutable log of all membership/role/position changes.
 ---
 
 ### 4.15 `notifications`
-Added in migration `00006_workspace_and_requests.sql`, modified in `00007_notification_types.sql` and `00009_broadcast_notifications.sql`. Stores in-app user notifications. Broadcast notifications have a NULL `profile_id` and are intended for all users. RLS allows users to read their own notifications or broadcast notifications. Included in the `supabase_realtime` publication for WebSocket streaming.
+Added in migration `00006_workspace_and_requests.sql`; modified in `00007_notification_types.sql`, `00009_broadcast_notifications.sql`, and **`00011_notification_routing.sql`**. Stores in-app notifications. Since `00011` the table has a **routing dimension (`audience`)** separate from the **styling dimension (`type`)**, plus a **branch context** so Chairs and super-admins can see branch-scoped activity. See [features/notifications.md](features/notifications.md) for the full system (event catalog, triggers, email, super-admin oversight, Chair feed). Included in the `supabase_realtime` publication for WebSocket streaming.
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | `id` | UUID | PK, DEFAULT `gen_random_uuid()` | |
-| `profile_id` | UUID | FK → `profiles`, ON DELETE CASCADE | Nullable (for broadcasts) |
+| `profile_id` | UUID | FK → `profiles`, ON DELETE CASCADE | Nullable — NULL for `branch`/`broadcast` audiences |
 | `title` | TEXT | NOT NULL | |
 | `message` | TEXT | NOT NULL | |
 | `link` | TEXT | | Optional URL |
-| `is_read` | BOOLEAN | NOT NULL, DEFAULT `false` | |
+| `is_read` | BOOLEAN | NOT NULL, DEFAULT `false` | Per-row (shared for branch/broadcast) |
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT `now()` | |
-| `type` | TEXT | NOT NULL, DEFAULT `'normal'` | `normal`, `broadcast`, `success`, `warning`, `error` |
+| `type` | TEXT | NOT NULL, DEFAULT `'normal'` | **Severity/styling:** `normal`, `info`, `success`, `warning`, `error` (legacy `broadcast` backfilled → `info`) |
+| `audience` | TEXT | NOT NULL, DEFAULT `'user'` | **Routing:** `user` \| `branch` \| `broadcast` *(00011)* |
+| `branch_id` | UUID | FK → `branches` | Branch context; required for `branch` audience *(00011)* |
+| `event_key` | TEXT | | Machine key of the trigger, e.g. `registration.approved` *(00011)* |
+| `actor_profile_id` | UUID | FK → `profiles` | Who caused it; NULL for system events *(00011)* |
 
-**Constraints:**
-- `notifications_recipient_check`: CHECK `(type = 'broadcast' AND profile_id IS NULL) OR (type != 'broadcast' AND profile_id IS NOT NULL)`
+**Constraints (since `00011`):**
+- `notifications_audience_check`: CHECK — `user` ⇒ `profile_id NOT NULL`; `branch` ⇒ `branch_id NOT NULL AND profile_id IS NULL`; `broadcast` ⇒ `profile_id IS NULL`. (Replaces the old `notifications_recipient_check`, which keyed off `type = 'broadcast'`.)
 
-**RLS:** Enabled. SELECT policy allows users to read rows where `auth.uid()::text = profile_id::text OR type = 'broadcast'`.
+**RLS (since `00011`):** policy `read own, broadcast, or chair-branch` — a row is visible if `audience = 'broadcast'`, OR `audience = 'user' AND auth.uid() = profile_id`, OR `audience = 'branch'` and the caller holds an **active `Chair` membership** in that `branch_id`. Super-admin reads use the service-role client and bypass RLS.
 
 ---
 
@@ -522,15 +526,12 @@ Added in migration `00006_workspace_and_requests.sql`, modified in `00007_notifi
 
 | Trigger | Table | Function | Purpose |
 |---------|-------|----------|---------|
-| `on_auth_user_created` | `auth.users` | `handle_new_user()` | Creates a `profiles` row with `status = 'pending'` when a new user signs up |
+| ~~`on_auth_user_created`~~ | ~~`auth.users`~~ | ~~`handle_new_user()`~~ | **DROPPED in `00003`** — see note below |
 | `profiles_updated_at` | `profiles` | `update_updated_at()` | Auto-sets `updated_at = now()` on any profile update |
 | `events_updated_at` | `events` | `update_updated_at()` | Auto-sets `updated_at = now()` on any event update |
+| `position_requests_updated_at` | `position_requests` | `update_updated_at()` | Auto-sets `updated_at = now()` on request update *(00006)* |
 
-### `handle_new_user()` (SECURITY DEFINER)
-```sql
-INSERT INTO profiles (id, email, full_name, avatar_url, status)
-VALUES (NEW.id, NEW.email, COALESCE(name, full_name), avatar_url, 'pending');
-```
+> **`handle_new_user()` is no longer active.** It was created in `00001` (and updated in `00002`) to auto-create a `profiles` row from `auth.users` on Supabase-Auth signup. Migration `00003_nextauth_migration.sql` **dropped the `on_auth_user_created` trigger** and decoupled `profiles` from `auth.users` when the app moved to NextAuth. Profile rows are now created **explicitly in application code** (`signUp` / `completeRegistration` in `src/app/auth/actions.ts`), not by a DB trigger. The function body still exists but nothing fires it.
 
 ---
 
@@ -712,4 +713,6 @@ WHERE ieee_membership_id = $1;
 | `00006_workspace_and_requests.sql` | Position requests + notifications | Added `profiles.bio`/`profiles.skills`. Added `position_request_status` enum and `position_requests` table (member-initiated requests to hold a position). Added `notifications` table. |
 | `00007_notification_types.sql` | Notification categorization | Added `notifications.type` column (`normal`, `broadcast`, `success`, `warning`, `error`). |
 | `00008_audit_log.sql` | Unified SuperAdmin audit trail | Added `audit_log` table (documented in §4.14) with indexes on `created_at`, `actor_profile_id`, and `(entity_type, entity_id)`. RLS enabled with no public policies (service-role only). Records structural/super-admin actions taken via the SuperAdmin portal. |
-| `00009_broadcast_notifications.sql` | Broadcast notifications | Made `notifications.profile_id` nullable, added CHECK constraint `notifications_recipient_check`, enabled RLS with SELECT policy, and added `notifications` table to `supabase_realtime` publication. |
+| `00009_broadcast_notifications.sql` | Broadcast notifications | Made `notifications.profile_id` nullable, added CHECK constraint `notifications_recipient_check`, enabled RLS with SELECT policy, and added `notifications`, `profiles`, `memberships` to the `supabase_realtime` publication. |
+| `00010_hardcoded_superadmin_profile.sql` | Backing profile for the fixed super-admin login | Seeds a `profiles` row with the synthetic id `11111111-1111-1111-1111-111111111111` (= `SUPERADMIN_ID` in `src/auth.ts`) so writes that FK-reference the acting admin (audit logs, `assigned_by`, `granted_by`) resolve. Login never reads this row — it exists purely for referential integrity. |
+| `00011_notification_routing.sql` | Notification routing + Chair visibility | Added `notifications.audience`/`branch_id`/`event_key`/`actor_profile_id`; replaced `notifications_recipient_check` with `notifications_audience_check`; replaced the RLS SELECT policy with `read own, broadcast, or chair-branch`; added branch/created/event indexes; backfilled legacy `type='broadcast'` rows to `audience='broadcast', type='info'`. See [features/notifications.md](features/notifications.md). **Apply manually in Supabase.** |

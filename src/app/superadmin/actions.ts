@@ -6,6 +6,8 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
 import { setImpersonation, clearImpersonation } from '@/utils/auth/impersonation'
 import { logAdminAction } from '@/utils/auth/audit'
+import { notifyUser, notifyBroadcast, notifyCustom } from '@/lib/notifications'
+import type { NotificationSeverity } from '@/lib/notifications'
 
 /**
  * Module-private guard: only a signed-in super admin may call the actions
@@ -160,6 +162,20 @@ export async function assignPosition(formData: FormData) {
     entityId: data.id, branchId: branch_id, summary: `Assigned a position to a user`,
     details: { profile_id, position_id },
   })
+
+  // Notify the promoted member (in-app + email)
+  const [{ data: pos }, { data: br }] = await Promise.all([
+    supabase.from('positions').select('name').eq('id', position_id).single(),
+    supabase.from('branches').select('name').eq('id', branch_id).single(),
+  ])
+  await notifyUser({
+    profileId: profile_id,
+    event: 'member.promoted',
+    params: { position: pos?.name ?? null, branch: br?.name ?? null },
+    actorProfileId: session.user!.id,
+    branchId: branch_id,
+  })
+
   revalidatePath(`/superadmin/users/${profile_id}`)
   return { success: true }
 }
@@ -186,6 +202,21 @@ export async function removePosition(formData: FormData) {
       entityId: membership_id, branchId: m.branch_id, summary: `Removed a user's position`,
       details: { profile_id: m.profile_id },
     })
+
+    const [{ data: pos }, { data: br }] = await Promise.all([
+      m.position_id
+        ? supabase.from('positions').select('name').eq('id', m.position_id).single()
+        : Promise.resolve({ data: null }),
+      supabase.from('branches').select('name').eq('id', m.branch_id).single(),
+    ])
+    await notifyUser({
+      profileId: m.profile_id,
+      event: 'member.position_removed',
+      params: { position: pos?.name ?? null, branch: br?.name ?? null },
+      actorProfileId: session.user!.id,
+      branchId: m.branch_id,
+    })
+
     revalidatePath(`/superadmin/users/${m.profile_id}`)
   }
   return { success: true }
@@ -208,6 +239,19 @@ export async function grantPermission(formData: FormData) {
     entityId: permission_id, branchId: branch_id, summary: `Granted a permission to a user`,
     details: { profile_id, permission_id },
   })
+
+  const [{ data: perm }, { data: br }] = await Promise.all([
+    supabase.from('permissions').select('name').eq('id', permission_id).single(),
+    supabase.from('branches').select('name').eq('id', branch_id).single(),
+  ])
+  await notifyUser({
+    profileId: profile_id,
+    event: 'permission.granted',
+    params: { permission: perm?.name ?? null, branch: br?.name ?? null },
+    actorProfileId: session.user!.id,
+    branchId: branch_id,
+  })
+
   revalidatePath(`/superadmin/users/${profile_id}`)
   return { success: true }
 }
@@ -230,6 +274,19 @@ export async function revokePermission(formData: FormData) {
       entityId: mp.permission_id, branchId: mp.branch_id, summary: `Revoked a permission`,
       details: { profile_id: mp.profile_id },
     })
+
+    const [{ data: perm }, { data: br }] = await Promise.all([
+      supabase.from('permissions').select('name').eq('id', mp.permission_id).single(),
+      supabase.from('branches').select('name').eq('id', mp.branch_id).single(),
+    ])
+    await notifyUser({
+      profileId: mp.profile_id,
+      event: 'permission.revoked',
+      params: { permission: perm?.name ?? null, branch: br?.name ?? null },
+      actorProfileId: session.user!.id,
+      branchId: mp.branch_id,
+    })
+
     revalidatePath(`/superadmin/users/${mp.profile_id}`)
   }
   return { success: true }
@@ -323,33 +380,31 @@ export async function setPositionPermissions(formData: FormData) {
   return { success: true }
 }
 
-// -- Broadcast Notifications ----------------------------------
+// -- Notifications: broadcast + targeted send -----------------
 
+const NOTIFICATION_SEVERITIES: NotificationSeverity[] = ['normal', 'info', 'success', 'warning', 'error']
+
+function coerceSeverity(value: string): NotificationSeverity {
+  return (NOTIFICATION_SEVERITIES as string[]).includes(value)
+    ? (value as NotificationSeverity)
+    : 'info'
+}
+
+/** Legacy broadcast entry point — routed through the unified service. */
 export async function sendBroadcastMessage(formData: FormData) {
   const session = await requireSuperAdmin()
   if (!session) return { error: 'Not authorized' }
 
   const title = String(formData.get('title') ?? '').trim()
   const message = String(formData.get('message') ?? '').trim()
-  const type = String(formData.get('type') ?? 'info')
+  const type = coerceSeverity(String(formData.get('type') ?? 'info'))
+  const link = String(formData.get('link') ?? '').trim() || null
 
   if (!title || !message) {
     return { error: 'Title and message are required' }
   }
 
-  const supabase = createAdminClient()
-  const { error } = await supabase
-    .from('notifications')
-    .insert({
-      profile_id: null,
-      title,
-      message,
-      type,
-    })
-
-  if (error) {
-    return { error: error.message }
-  }
+  await notifyBroadcast({ title, message, type, link, actorProfileId: session.user!.id })
 
   await logAdminAction({
     actorProfileId: session.user!.id,
@@ -359,6 +414,56 @@ export async function sendBroadcastMessage(formData: FormData) {
     branchId: null,
     summary: `Sent broadcast message: "${title}"`,
     details: { type },
+  })
+
+  return { success: true }
+}
+
+/**
+ * Unified super-admin send. `target` selects the audience:
+ *  - 'broadcast' → everyone
+ *  - 'user'      → a specific profile (`profile_id`), optionally emailed
+ *  - 'branch'    → a branch's Chairs (`branch_id`)
+ */
+export async function sendNotification(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+
+  const target = String(formData.get('target') ?? 'broadcast')
+  const title = String(formData.get('title') ?? '').trim()
+  const message = String(formData.get('message') ?? '').trim()
+  const type = coerceSeverity(String(formData.get('type') ?? 'info'))
+  const link = String(formData.get('link') ?? '').trim() || null
+
+  if (!title || !message) return { error: 'Title and message are required' }
+
+  if (target === 'user') {
+    const profile_id = String(formData.get('profile_id') ?? '')
+    if (!profile_id) return { error: 'Select a user to notify' }
+    await notifyCustom({
+      audience: 'user', profileId: profile_id, title, message, type, link,
+      actorProfileId: session.user!.id,
+    })
+  } else if (target === 'branch') {
+    const branch_id = String(formData.get('branch_id') ?? '')
+    if (!branch_id) return { error: 'Select a branch to notify' }
+    // Free-form branch send (custom content, not a catalog event).
+    await notifyCustom({
+      audience: 'branch', branchId: branch_id, title, message, type, link,
+      actorProfileId: session.user!.id,
+    })
+  } else {
+    await notifyBroadcast({ title, message, type, link, actorProfileId: session.user!.id })
+  }
+
+  await logAdminAction({
+    actorProfileId: session.user!.id,
+    action: 'notification_sent',
+    entityType: 'user',
+    entityId: session.user!.id,
+    branchId: target === 'branch' ? String(formData.get('branch_id') ?? '') || null : null,
+    summary: `Sent a ${target} notification: "${title}"`,
+    details: { target, type },
   })
 
   return { success: true }

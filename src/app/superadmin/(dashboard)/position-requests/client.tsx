@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -86,10 +86,10 @@ export function SuperAdminPositionRequestsClient({ pending, history, cancelled }
             />
           </div>
           
-          <Button variant="outline" className="w-full sm:w-auto" render={<Link href="/superadmin/users" className="inline-flex items-center justify-center whitespace-nowrap" />}>
+          <Link href="/superadmin/users" className={buttonVariants({ variant: "outline", className: "w-full sm:w-auto" })}>
             <UserPlus className="mr-2 h-4 w-4" />
             Direct Assign User
-          </Button>
+          </Link>
         </div>
       </div>
 

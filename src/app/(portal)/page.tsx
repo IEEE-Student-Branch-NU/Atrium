@@ -70,6 +70,8 @@ function actionColor(action: string): string {
 
 // ── Page ─────────────────────────────────────────────────────
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const session = await auth()
 
@@ -94,6 +96,7 @@ export default async function DashboardPage() {
   const canApproveRegs = hasPermission(permissions, 'approve_registrations')
   const canApproveEvents = hasPermission(permissions, 'approve_events')
   const canViewMembers = hasPermission(permissions, 'view_members')
+  const canManageEvents = hasPermission(permissions, 'manage_events')
 
   // Greeting based on time
   const hour = new Date().getHours()
@@ -210,7 +213,18 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Quick Actions</CardTitle>
             <CardDescription>Jump to common tasks</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="flex flex-col gap-3">
+            {canManageEvents && (
+              <Link href="/events/management">
+                <Button variant="outline" className="w-full justify-between group">
+                  <span className="flex items-center gap-2">
+                    <CalendarPlus className="h-4 w-4" />
+                    Event Management
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                </Button>
+              </Link>
+            )}
             {canCreateEvents && (
               <Link href="/events/create">
                 <Button variant="outline" className="w-full justify-between group">
@@ -233,22 +247,20 @@ export default async function DashboardPage() {
                 </Button>
               </Link>
             )}
-            {canViewMembers && (
-              <Link href="/members">
-                <Button variant="outline" className="w-full justify-between group">
-                  <span className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    View Members
-                  </span>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
-                </Button>
-              </Link>
-            )}
+            <Link href="/members">
+              <Button variant="outline" className="w-full justify-between group">
+                <span className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  View Members
+                </span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+              </Button>
+            </Link>
             <Link href="/events">
               <Button variant="outline" className="w-full justify-between group">
                 <span className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  My Events
+                  Events
                 </span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
               </Button>

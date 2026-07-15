@@ -43,8 +43,8 @@ export default async function PositionRequestsPage() {
     getDecidedPositionRequests()
   ])
 
-  // Filter if not superadmin (or wildcard perms)
-  if (!permissions.includes('*')) {
+  // Filter if not superadmin (or wildcard perms) and not MDO
+  if (!permissions.includes('*') && profile.position_name !== 'MDO') {
     pending = pending.filter(req => req.branch_name === profile.branch_name)
     cancelled = cancelled.filter(req => req.branch_name === profile.branch_name)
     decided = decided.filter(req => req.branch_name === profile.branch_name)

@@ -207,6 +207,7 @@ export interface FullUserProfile {
   avatar_url: string | null
   phone: string | null
   ieee_membership_id: string | null
+  membership_expiry?: string | null
   section: string | null
   bio: string | null
   skills: string[] | null
@@ -230,7 +231,7 @@ export async function getFullUserProfile(profileId: string): Promise<FullUserPro
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, section, bio, skills, status, created_at, password_hash')
+    .select('id, email, full_name, avatar_url, phone, ieee_membership_id, membership_expiry, section, bio, skills, status, created_at, password_hash')
     .eq('id', profileId)
     .single()
 
@@ -527,6 +528,21 @@ export async function getAllBranches(): Promise<BranchOption[]> {
   return data ?? []
 }
 
+export interface EventTypeOption {
+  id: string
+  name: string
+  description: string | null
+}
+
+export async function getAllEventTypes(): Promise<EventTypeOption[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('event_types')
+    .select('id, name, description')
+    .order('name')
+  return data || []
+}
+
 export async function getPositionsForBranch(branchId: string): Promise<PositionOption[]> {
   const supabase = createAdminClient()
   const { data } = await supabase
@@ -565,19 +581,24 @@ export interface PendingMember {
   phone: string | null
   section: string | null
   created_at: string
+  status: string
 }
 
-export async function getPendingRegistrations(): Promise<PendingMember[]> {
+export async function getPendingRegistrations(branchId?: string): Promise<PendingMember[]> {
   const supabase = createAdminClient()
 
-  const { data } = await supabase
+  let query = supabase
     .from('profiles')
-    .select('id, full_name, email, ieee_membership_id, phone, section, created_at')
-    .eq('status', 'pending')
-    .not('ieee_membership_id', 'is', null)
+    .select('id, full_name, email, ieee_membership_id, phone, section, created_at, status' + (branchId ? ', memberships!memberships_profile_id_fkey!inner(branch_id)' : ''))
+    .in('status', ['pending', 'under_review'])
     .order('created_at', { ascending: true })
 
-  return data ?? []
+  if (branchId) {
+    query = query.eq('memberships.branch_id', branchId)
+  }
+
+  const { data } = await query
+  return data as unknown as PendingMember[] ?? []
 }
 
 // ── Approval History ─────────────────────────────────────────
@@ -592,19 +613,26 @@ export interface ApprovalHistoryItem {
   approved_at: string | null
   created_at: string
   approver_name: string | null
+  approved_by_position: string | null
 }
 
-export async function getApprovalHistory(limit = 50): Promise<ApprovalHistoryItem[]> {
+export async function getApprovalHistory(limit = 50, branchId?: string): Promise<ApprovalHistoryItem[]> {
   const supabase = createAdminClient()
 
-  const { data } = await supabase
+  let query = supabase
     .from('profiles')
-    .select('id, full_name, email, ieee_membership_id, status, rejected_reason, approved_at, created_at, profiles!profiles_approved_by_fkey(full_name)')
+    .select('id, full_name, email, ieee_membership_id, status, rejected_reason, approved_at, created_at, approved_by_position, approver:profiles!approved_by(full_name)' + (branchId ? ', memberships!memberships_profile_id_fkey!inner(branch_id)' : ''))
     .in('status', ['approved', 'rejected'])
     .order('updated_at', { ascending: false })
     .limit(limit)
 
-  return (data ?? []).map((item) => ({
+  if (branchId) {
+    query = query.eq('memberships.branch_id', branchId)
+  }
+
+  const { data } = await query
+
+  return ((data as any[]) ?? []).map((item) => ({
     id: item.id,
     full_name: item.full_name,
     email: item.email,
@@ -613,7 +641,8 @@ export async function getApprovalHistory(limit = 50): Promise<ApprovalHistoryIte
     rejected_reason: item.rejected_reason,
     approved_at: item.approved_at,
     created_at: item.created_at,
-    approver_name: (item.profiles as any)?.full_name ?? null,
+    approver_name: (item.approver as any)?.full_name ?? null,
+    approved_by_position: item.approved_by_position ?? null,
   }))
 }
 
@@ -669,6 +698,7 @@ export interface DirectoryMember {
   ieee_membership_id: string | null
   phone: string | null
   section: string | null
+  membership_expiry: string | null
   status: string
   created_at: string
   branch_name: string | null
@@ -681,7 +711,7 @@ export async function getMembersDirectory(): Promise<DirectoryMember[]> {
   // Fetch all approved profiles
   const { data: profiles, error } = await supabase
     .from('profiles')
-    .select('id, email, full_name, avatar_url, ieee_membership_id, phone, section, status, created_at')
+    .select('id, email, full_name, avatar_url, ieee_membership_id, phone, section, membership_expiry, status, created_at')
     .eq('status', 'approved')
     .order('full_name', { ascending: true })
 

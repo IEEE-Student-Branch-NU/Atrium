@@ -9,6 +9,8 @@ export const metadata = {
   title: 'Approvals | Atrium',
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function ApprovalsPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
@@ -24,10 +26,14 @@ export default async function ApprovalsPage() {
     redirect('/')
   }
 
+  // If superadmin, fetch all. Otherwise, fetch only for MDO's branch
+  const isSuperAdmin = permissions.includes('*')
+  const targetBranchId = isSuperAdmin ? undefined : (profile.branch_id ?? undefined)
+
   // Fetch data
   const [pending, history] = await Promise.all([
-    getPendingRegistrations(),
-    getApprovalHistory(50),
+    getPendingRegistrations(targetBranchId),
+    getApprovalHistory(50, targetBranchId),
   ])
 
   return <ApprovalsClient pending={pending} history={history} />

@@ -135,6 +135,59 @@ export async function changePassword(formData: FormData) {
 }
 
 /**
+ * Update the user's membership details (IEEE ID).
+ * Requires current password.
+ */
+export async function updateMembershipDetails(formData: FormData) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return { error: 'Not authenticated' }
+  }
+
+  const ieeeMembershipId = formData.get('ieeeMembershipId') as string
+  const currentPassword = formData.get('currentPassword') as string
+
+  if (!currentPassword) {
+    return { error: 'Current password is required to update membership details.' }
+  }
+
+  const supabase = createAdminClient()
+
+  // Get current password hash
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('password_hash')
+    .eq('id', session.user.id)
+    .single()
+
+  const hasPassword = !!profile?.password_hash
+
+  if (!hasPassword) {
+    return { error: 'Please set a password first using the Security section.' }
+  }
+
+  // Verify current password
+  const isValid = await bcrypt.compare(currentPassword, profile.password_hash)
+  if (!isValid) {
+    return { error: 'Current password is incorrect.' }
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ ieee_membership_id: ieeeMembershipId || null })
+    .eq('id', session.user.id)
+
+  if (error) {
+    console.error('Membership update error:', error)
+    return { error: 'Failed to update membership details. Please try again.' }
+  }
+
+  revalidatePath('/profile')
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+/**
  * Submit a request for a new position.
  */
 export async function requestPosition(formData: FormData) {

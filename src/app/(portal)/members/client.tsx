@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Users, Copy, Check, Mail, Phone, Hash, Building2, ChevronDown } from 'lucide-react'
+import { Search, Users, Copy, Check, Mail, Phone, Hash, Building2, ChevronDown, Calendar, MoreVertical } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import type { DirectoryMember } from '@/lib/queries'
 import { createClient } from '@/utils/supabase/client'
+import { EditExpiryModal } from './EditExpiryModal'
 
 function getInitials(name: string | null): string {
   if (!name) return '?'
@@ -62,6 +63,9 @@ export function MembersDirectoryClient({
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
+  
+  const [editingMember, setEditingMember] = useState<DirectoryMember | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Setup Realtime subscription
   useEffect(() => {
@@ -198,15 +202,34 @@ export function MembersDirectoryClient({
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((member) => (
+          {filtered.map((member) => {
+            return (
               <Card 
                 key={member.id}
-                className="group hover:border-primary/30 transition-colors cursor-pointer h-full"
+                className="group hover:border-primary/30 transition-colors cursor-pointer h-full relative"
                 onClick={() => router.push(`/members/${member.id}`)}
               >
+                <div className="absolute top-2 right-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger render={
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()} />
+                    }>
+                      <MoreVertical className="h-4 w-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuItem onClick={() => {
+                        setEditingMember(member)
+                        setIsModalOpen(true)
+                      }}>
+                        <Calendar className="mr-2 h-4 w-4" />
+                        Edit Expiry Date
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 <CardContent className="p-4 space-y-3">
                   {/* Top: Avatar + Name + Position */}
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 pr-8">
                     <Avatar className="h-10 w-10 shrink-0">
                       <AvatarImage src={member.avatar_url ?? undefined} alt={member.full_name ?? ''} />
                       <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
@@ -260,12 +283,19 @@ export function MembersDirectoryClient({
                         <CopyButton value={member.ieee_membership_id} label="IEEE ID" />
                       </div>
                     )}
+
                   </div>
                 </CardContent>
               </Card>
-          ))}
+            )
+          })}
         </div>
       )}
+      <EditExpiryModal 
+        member={editingMember} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </div>
   )
 }

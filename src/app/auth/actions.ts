@@ -86,7 +86,7 @@ export async function signUp(formData: FormData) {
   const roleName = (formData.get('role') as string) || 'Member'
 
   // ── Validation ──────────────────────────────────────────
-  if (!email || !password || !fullName || !ieeeMembershipId) {
+  if (!email || !password || !fullName || !ieeeMembershipId || !phone) {
     return { error: 'All required fields must be filled.' }
   }
 
@@ -106,7 +106,7 @@ export async function signUp(formData: FormData) {
     return { error: 'IEEE Membership ID must be 6-12 digits.' }
   }
 
-  if (phone && !/^\+91\s\d{5}\s\d{5}$/.test(phone)) {
+  if (!/^\+91\s\d{5}\s\d{5}$/.test(phone)) {
     return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
   }
 
@@ -203,15 +203,15 @@ export async function completeRegistration(formData: FormData) {
   const branchSlug = (formData.get('branch') as string) || 'sbnu'
   const roleName = (formData.get('role') as string) || 'Member'
 
-  if (!ieeeMembershipId) {
-    return { error: 'IEEE Membership ID is required.' }
+  if (!ieeeMembershipId || !phone) {
+    return { error: 'All required fields must be filled.' }
   }
 
   if (!/^\d{6,12}$/.test(ieeeMembershipId)) {
     return { error: 'IEEE Membership ID must be 6-12 digits.' }
   }
 
-  if (phone && !/^\+91\s?\d{5}\s?\d{5}$/.test(phone)) {
+  if (!/^\+91\s?\d{5}\s?\d{5}$/.test(phone)) {
     return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
   }
 
@@ -294,11 +294,21 @@ async function assignMembership(supabase: any, profileId: string, branchSlug: st
       }
     }
     
+    // Always grant the base 'Member' role
     await supabase.from('memberships').insert({
       profile_id: profileId,
       branch_id: branch.id,
-      position_id: positionId,
+      position_id: null,
     })
+
+    // If they requested a specific role, grant that additionally
+    if (positionId) {
+      await supabase.from('memberships').insert({
+        profile_id: profileId,
+        branch_id: branch.id,
+        position_id: positionId,
+      })
+    }
   } catch (err) {
     console.error('Failed to assign membership:', err)
   }

@@ -197,12 +197,15 @@ export default function SignupPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone">Phone</Label>
+                  <Label htmlFor="phone">
+                    Phone <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="phone"
                     name="phone"
                     type="tel"
                     placeholder="+91 XXXXX XXXXX"
+                    required
                     pattern="\+91\s\d{5}\s\d{5}"
                     title="Format: +91 XXXXX XXXXX"
                     onChange={(e) => {

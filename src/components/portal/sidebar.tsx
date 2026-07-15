@@ -77,7 +77,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Events',
     items: [
-      { label: 'My Events', href: '/events', icon: Calendar },
+      { label: 'Events', href: '/events', icon: Calendar },
+      { label: 'Event Management', href: '/events/management', icon: LayoutDashboard, permission: 'manage_events' },
       { label: 'Create Event', href: '/events/create', icon: CalendarPlus, permission: 'create_events' },
       { label: 'Approve Events', href: '/events/approvals', icon: CheckSquare, permission: 'approve_events' },
     ],
@@ -163,7 +164,7 @@ function RoleSwitcher({
       const result = await switchWorkspace(m.id)
       if (result.success) {
         toast.success(`Switched to ${m.position_name ?? 'Member'} · ${m.branch_name}`)
-        router.refresh()
+        router.push('/')
       } else {
         toast.error(result.error ?? 'Could not switch workspace')
       }
@@ -177,7 +178,7 @@ function RoleSwitcher({
     return (
       <div className="px-2 py-2">
         <Tooltip>
-          <TooltipTrigger>
+          <TooltipTrigger render={<div className="inline-flex" />}>
             <DropdownMenu>
               <DropdownMenuTrigger render={
                 <Button

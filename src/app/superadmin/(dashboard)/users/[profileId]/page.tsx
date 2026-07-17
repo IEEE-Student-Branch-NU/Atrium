@@ -22,6 +22,8 @@ import { getAllBranches, getPositionsGroupedByBranch } from '@/lib/queries'
 import { getUserAdminDetail, getAllPermissions } from '@/app/superadmin/queries'
 import { openWorkspace, removePosition, revokePermission } from '@/app/superadmin/actions'
 import { AssignPositionDialog, GrantPermissionDialog } from '../user-actions'
+import { ResetPasswordDialog } from '../reset-password-dialog'
+import { HardDeleteUserDialog } from '../hard-delete-user-dialog'
 
 // `openWorkspace`, `removePosition`, and `revokePermission` return `{ error }`
 // on the unauthorized/not-found paths, which isn't assignable to a
@@ -292,17 +294,15 @@ export default async function UserDetailPage({
         </CardContent>
       </Card>
 
-      {/* Account */}
-      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+      {/* Account (Danger Zone) */}
+      <Card className="border-destructive/50 bg-destructive/5">
         <CardHeader>
-          <CardTitle className="text-base">Account</CardTitle>
-          <CardDescription>Account-level actions for this user.</CardDescription>
+          <CardTitle className="text-base text-destructive">Danger Zone</CardTitle>
+          <CardDescription>Critical account-level actions for this user.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="outline" disabled>
-            <KeyRound className="h-4 w-4" />
-            Reset Password (coming soon)
-          </Button>
+        <CardContent className="flex flex-col sm:flex-row gap-4">
+          <ResetPasswordDialog profileId={profile.id} />
+          <HardDeleteUserDialog profileId={profile.id} />
         </CardContent>
       </Card>
     </div>

@@ -6,6 +6,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
 import { setImpersonation, clearImpersonation } from '@/utils/auth/impersonation'
 import { logAdminAction } from '@/utils/auth/audit'
+import { getEffectiveActor, verifySuperAdminPassword } from '@/utils/auth/superadmin'
 import { notifyUser, notifyBroadcast, notifyCustom } from '@/lib/notifications'
 import type { NotificationSeverity } from '@/lib/notifications'
 
@@ -184,11 +185,19 @@ export async function removePosition(formData: FormData) {
   const session = await requireSuperAdmin()
   if (!session) return { error: 'Not authorized' }
   const membership_id = String(formData.get('membership_id') ?? '')
+  const password = String(formData.get('password') ?? '')
   if (!membership_id) return { error: 'Membership required' }
 
   const supabase = createAdminClient()
   const { data: m } = await supabase.from('memberships')
-    .select('profile_id, branch_id, position_id').eq('id', membership_id).single()
+    .select('profile_id, branch_id, position_id, positions(name)').eq('id', membership_id).single()
+  
+  if (m?.positions?.name?.toLowerCase().includes('superadmin')) {
+    if (!password || !(await verifySuperAdminPassword(session.user?.email, password))) {
+      return { error: 'Incorrect superadmin password' }
+    }
+  }
+
   const { error } = await supabase.from('memberships')
     .update({ ended_at: new Date().toISOString() }).eq('id', membership_id).is('ended_at', null)
   if (error) return { error: error.message }
@@ -464,6 +473,63 @@ export async function sendNotification(formData: FormData) {
     branchId: target === 'branch' ? String(formData.get('branch_id') ?? '') || null : null,
     summary: `Sent a ${target} notification: "${title}"`,
     details: { target, type },
+  })
+
+  return { success: true }
+}
+
+export async function resetUserPassword(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const profileId = String(formData.get('profile_id') ?? '')
+  const newPassword = String(formData.get('password') ?? '')
+  if (!profileId || !newPassword) return { error: 'Profile ID and new password required' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase.auth.admin.updateUserById(profileId, { password: newPassword })
+  if (error) return { error: error.message }
+
+  await logAdminAction({
+    actorProfileId: session.user!.id,
+    action: 'password_reset',
+    entityType: 'user',
+    entityId: profileId,
+    summary: `Reset password for user`,
+  })
+
+  return { success: true }
+}
+
+export async function hardDeleteUser(formData: FormData) {
+  const session = await requireSuperAdmin()
+  if (!session) return { error: 'Not authorized' }
+  const profileId = String(formData.get('profile_id') ?? '')
+  const password = String(formData.get('password') ?? '')
+  if (!profileId || !password) return { error: 'Profile ID and password required' }
+
+  if (!(await verifySuperAdminPassword(session.user?.email, password))) {
+    return { error: 'Incorrect superadmin password' }
+  }
+
+  const supabase = createAdminClient()
+  
+  // Get ieee_membership_id to delete from pre_approved_members if it exists
+  const { data: profile } = await supabase.from('profiles').select('ieee_membership_id').eq('id', profileId).single()
+  
+  if (profile?.ieee_membership_id) {
+    await supabase.from('pre_approved_members').delete().eq('ieee_membership_id', profile.ieee_membership_id)
+  }
+
+  // Delete user from auth, which cascades to everything else
+  const { error } = await supabase.auth.admin.deleteUser(profileId)
+  if (error) return { error: error.message }
+
+  await logAdminAction({
+    actorProfileId: session.user!.id,
+    action: 'hard_delete_user',
+    entityType: 'user',
+    entityId: profileId,
+    summary: `Hard deleted user from the system`,
   })
 
   return { success: true }

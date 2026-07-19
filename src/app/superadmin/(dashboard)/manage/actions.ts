@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/utils/supabase/server'
-import { getEffectiveActor } from '@/utils/auth/superadmin'
+import { getEffectiveActor, verifySuperAdminPassword } from '@/utils/auth/superadmin'
 import bcrypt from 'bcrypt'
 
 const DEFAULT_PASSPHRASE = 'ieee-sbnu-nirma'
@@ -50,10 +50,14 @@ export async function addSuperadmin(email: string) {
 /**
  * Remove a superadmin
  */
-export async function removeSuperadmin(id: string) {
+export async function removeSuperadmin(id: string, password?: string) {
   const actor = await getEffectiveActor()
   if (!actor.isSuperAdmin) {
     return { error: 'Unauthorized: Only superadmins can remove superadmins.' }
+  }
+
+  if (!password || !(await verifySuperAdminPassword(actor.realEmail, password))) {
+    return { error: 'Incorrect superadmin password.' }
   }
 
   try {

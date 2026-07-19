@@ -35,14 +35,17 @@ export async function getOrganizationTree(): Promise<OrgNode[]> {
   const { data: branches } = await supabase
     .from('branches').select('id, name, slug, description, parent_id').order('name')
   const { data: members } = await supabase
-    .from('memberships').select('branch_id').is('ended_at', null)
+    .from('memberships').select('branch_id, profile_id').is('ended_at', null)
 
-  const counts = new Map<string, number>()
-  for (const m of members ?? []) counts.set(m.branch_id, (counts.get(m.branch_id) ?? 0) + 1)
+  const branchUsers = new Map<string, Set<string>>()
+  for (const m of members ?? []) {
+    if (!branchUsers.has(m.branch_id)) branchUsers.set(m.branch_id, new Set())
+    branchUsers.get(m.branch_id)!.add(m.profile_id)
+  }
 
   const nodes = new Map<string, OrgNode>()
   for (const b of branches ?? []) {
-    nodes.set(b.id, { ...b, memberCount: counts.get(b.id) ?? 0, children: [] })
+    nodes.set(b.id, { ...b, memberCount: branchUsers.get(b.id)?.size ?? 0, children: [] })
   }
   const roots: OrgNode[] = []
   for (const node of nodes.values()) {

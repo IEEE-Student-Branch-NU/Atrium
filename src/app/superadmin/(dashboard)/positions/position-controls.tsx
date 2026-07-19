@@ -216,6 +216,10 @@ function DeletePositionButton({ position }: { position: PositionSummary }) {
 
 // ── Permissions Editor ───────────────────────────────────────
 
+function formatPermissionName(name: string) {
+  return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
+
 function PermissionsDialog({
   position,
   allPermissions,
@@ -276,7 +280,7 @@ function PermissionsDialog({
                     className="mt-0.5"
                   />
                   <span className="flex flex-col">
-                    <span className="text-sm">{perm.name}</span>
+                    <span className="text-sm">{formatPermissionName(perm.name)}</span>
                     {perm.description && (
                       <span className="text-xs text-muted-foreground">{perm.description}</span>
                     )}
@@ -323,7 +327,7 @@ export function PositionRow({
           ) : (
             grantedPermissions.map((p) => (
               <Badge key={p.id} variant="secondary" className="font-normal border-transparent bg-muted">
-                {p.name}
+                {formatPermissionName(p.name)}
               </Badge>
             ))
           )}

@@ -27,6 +27,10 @@ import { assignPosition, grantPermission } from '@/app/superadmin/actions'
 import type { BranchOption, PositionOption } from '@/lib/queries'
 import type { PermissionRow } from '@/app/superadmin/queries'
 
+function formatPermissionName(name: string) {
+  return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
+
 type ActionResult = { success?: boolean; error?: string }
 
 const initialState: ActionResult = {}
@@ -102,9 +106,9 @@ export function AssignPositionDialog({
               </Label>
               <Select
                 name="branch_id"
-                value={branchId || undefined}
+                value={branchId}
                 onValueChange={(value) => {
-                  setBranchId(String(value))
+                  setBranchId(value)
                   setPositionId('')
                 }}
               >
@@ -133,7 +137,7 @@ export function AssignPositionDialog({
                 key={branchId} 
                 name="position_id" 
                 disabled={!branchId}
-                value={positionId || undefined}
+                value={positionId}
                 onValueChange={(val) => setPositionId(String(val))}
               >
                 <SelectTrigger id="assign-position" className="w-full">
@@ -183,12 +187,17 @@ export function GrantPermissionDialog({ profileId, branches, permissions }: Gran
   const router = useRouter()
   const [open, setOpen] = useState(false)
 
+  const [branchId, setBranchId] = useState<string | null>(null)
+  const [permissionId, setPermissionId] = useState<string | null>(null)
+
   const [, formAction, pending] = useActionState<ActionResult, FormData>(
     async (_prevState, formData) => {
       const result = await grantPermission(formData)
       if (result?.success) {
         toast.success('Permission granted')
         setOpen(false)
+        setBranchId(null)
+        setPermissionId(null)
         router.refresh()
       } else if (result?.error) {
         toast.error(result.error)
@@ -220,9 +229,15 @@ export function GrantPermissionDialog({ profileId, branches, permissions }: Gran
               <Label htmlFor="grant-branch">
                 Branch <span className="text-destructive">*</span>
               </Label>
-              <Select name="branch_id">
+              <Select 
+                name="branch_id"
+                value={branchId}
+                onValueChange={(val) => setBranchId(String(val))}
+              >
                 <SelectTrigger id="grant-branch" className="w-full">
-                  <SelectValue placeholder="Select a branch" />
+                  <SelectValue placeholder="Select a branch">
+                    {branchId ? branches.find((b) => b.id === branchId)?.name : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {branches.map((b) => (
@@ -238,14 +253,20 @@ export function GrantPermissionDialog({ profileId, branches, permissions }: Gran
               <Label htmlFor="grant-permission">
                 Permission <span className="text-destructive">*</span>
               </Label>
-              <Select name="permission_id">
+              <Select 
+                name="permission_id"
+                value={permissionId}
+                onValueChange={(val) => setPermissionId(String(val))}
+              >
                 <SelectTrigger id="grant-permission" className="w-full">
-                  <SelectValue placeholder="Select a permission" />
+                  <SelectValue placeholder="Select a permission">
+                    {permissionId ? formatPermissionName(permissions.find((p) => p.id === permissionId)?.name || '') : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {permissions.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.name}
+                      {formatPermissionName(p.name)}
                     </SelectItem>
                   ))}
                 </SelectContent>

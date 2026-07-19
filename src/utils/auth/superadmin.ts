@@ -57,3 +57,24 @@ export async function getEffectiveActor(): Promise<EffectiveActor> {
 
   return resolveEffectiveActor({ realProfileId, realEmail, isSuperAdmin: isSA, impersonatedMembership })
 }
+
+/**
+ * Verifies if the provided password matches the superadmin password for the given email.
+ * This checks the database superadmins table.
+ */
+export async function verifySuperAdminPassword(email: string | null | undefined, password: string): Promise<boolean> {
+  if (!email) return false
+  
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('superadmins')
+    .select('passphrase_hash')
+    .eq('email', email)
+    .single()
+    
+  if (data?.passphrase_hash) {
+    return await bcrypt.compare(password, data.passphrase_hash)
+  }
+  
+  return false
+}

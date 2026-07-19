@@ -9,34 +9,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
-import { Trash2 } from 'lucide-react'
-import { removeSuperadmin } from './actions'
-import { toast } from 'sonner'
+import { RemoveSuperadminDialog } from './remove-superadmin-dialog'
 
 type SuperadminListProps = {
   superadmins: { id: string; email: string; created_at: string }[]
 }
 
 export function SuperadminList({ superadmins }: SuperadminListProps) {
-  const [removingId, setRemovingId] = useState<string | null>(null)
-
-  async function handleRemove(id: string, email: string) {
-    if (!window.confirm(`Are you sure you want to revoke superadmin access for ${email}?`)) {
-      return
-    }
-
-    setRemovingId(id)
-    const result = await removeSuperadmin(id)
-    
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success('Superadmin access revoked successfully.')
-    }
-    setRemovingId(null)
-  }
-
   if (superadmins.length === 0) {
     return <div className="p-4 text-center text-sm text-muted-foreground">No superadmins found.</div>
   }
@@ -63,16 +42,14 @@ export function SuperadminList({ superadmins }: SuperadminListProps) {
                 })}
               </TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => handleRemove(sa.id, sa.email)}
-                  disabled={removingId === sa.id}
-                  title="Revoke access"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <RemoveSuperadminDialog 
+                  id={sa.id} 
+                  email={sa.email} 
+                  onRemoved={() => {
+                    // Optionally, trigger a router.refresh() if needed, 
+                    // but the action already revalidates the path.
+                  }} 
+                />
               </TableCell>
             </TableRow>
           ))}

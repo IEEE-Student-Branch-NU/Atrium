@@ -24,6 +24,11 @@ import { openWorkspace, removePosition, revokePermission } from '@/app/superadmi
 import { AssignPositionDialog, GrantPermissionDialog } from '../user-actions'
 import { ResetPasswordDialog } from '../reset-password-dialog'
 import { HardDeleteUserDialog } from '../hard-delete-user-dialog'
+import { RemoveSuperadminDialog } from '../remove-superadmin-dialog'
+
+function formatPermissionName(name: string) {
+  return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
 
 // `openWorkspace`, `removePosition`, and `revokePermission` return `{ error }`
 // on the unauthorized/not-found paths, which isn't assignable to a
@@ -191,12 +196,16 @@ export default async function UserDetailPage({
                               Open Workspace
                             </Button>
                           </form>
-                          <form action={removePositionAction}>
-                            <input type="hidden" name="membership_id" value={m.id} />
-                            <Button type="submit" variant="destructive" size="sm">
-                              Remove
-                            </Button>
-                          </form>
+                          {m.positions?.name?.toLowerCase().includes('superadmin') ? (
+                            <RemoveSuperadminDialog membershipId={m.id} positionName={m.positions.name} />
+                          ) : (
+                            <form action={removePositionAction}>
+                              <input type="hidden" name="membership_id" value={m.id} />
+                              <Button type="submit" variant="destructive" size="sm">
+                                Remove
+                              </Button>
+                            </form>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -275,7 +284,7 @@ export default async function UserDetailPage({
                   {grants.map((g) => (
                     <TableRow key={g.id}>
                       <TableCell className="font-medium">{g.branches?.name ?? '—'}</TableCell>
-                      <TableCell>{g.permissions?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell>{g.permissions?.name ? formatPermissionName(g.permissions.name) : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="text-muted-foreground">{formatDate(g.granted_at)}</TableCell>
                       <TableCell className="text-right">
                         <form action={revokePermissionAction}>

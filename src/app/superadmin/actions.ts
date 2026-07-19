@@ -6,6 +6,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
 import { setImpersonation, clearImpersonation } from '@/utils/auth/impersonation'
 import { logAdminAction } from '@/utils/auth/audit'
+import { getEffectiveActor, verifySuperAdminPassword } from '@/utils/auth/superadmin'
 import { notifyUser, notifyBroadcast, notifyCustom } from '@/lib/notifications'
 import type { NotificationSeverity } from '@/lib/notifications'
 
@@ -184,11 +185,19 @@ export async function removePosition(formData: FormData) {
   const session = await requireSuperAdmin()
   if (!session) return { error: 'Not authorized' }
   const membership_id = String(formData.get('membership_id') ?? '')
+  const password = String(formData.get('password') ?? '')
   if (!membership_id) return { error: 'Membership required' }
 
   const supabase = createAdminClient()
   const { data: m } = await supabase.from('memberships')
-    .select('profile_id, branch_id, position_id').eq('id', membership_id).single()
+    .select('profile_id, branch_id, position_id, positions(name)').eq('id', membership_id).single()
+  
+  if (m?.positions?.name?.toLowerCase().includes('superadmin')) {
+    if (!password || !(await verifySuperAdminPassword(session.user?.email, password))) {
+      return { error: 'Incorrect superadmin password' }
+    }
+  }
+
   const { error } = await supabase.from('memberships')
     .update({ ended_at: new Date().toISOString() }).eq('id', membership_id).is('ended_at', null)
   if (error) return { error: error.message }
@@ -498,7 +507,7 @@ export async function hardDeleteUser(formData: FormData) {
   const password = String(formData.get('password') ?? '')
   if (!profileId || !password) return { error: 'Profile ID and password required' }
 
-  if (password !== process.env.SUPERADMIN_PASSWORD) {
+  if (!(await verifySuperAdminPassword(session.user?.email, password))) {
     return { error: 'Incorrect superadmin password' }
   }
 

@@ -5,19 +5,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { isSuperAdmin } from '@/utils/auth/superadmin'
 import authConfig from './auth.config'
 
-// ── Fixed super-admin login ────────────────────────────────────
-// One super-admin signs in with a FIXED username + password (not an email /
-// Google account). The credential values are read from environment variables
-// (SUPERADMIN_USERNAME / SUPERADMIN_PASSWORD) so this public repo never
-// contains the working secret — set them in the deployment env (Vercel) and in
-// `.env.local` for local dev. Matching happens entirely in code below; no DB
-// read at auth time. The synthetic identity's id is backed by a seeded
-// `profiles` row (migration `00010_hardcoded_superadmin_profile.sql`) so audit
-// / membership writes that FK-reference the acting admin resolve.
-const SUPERADMIN_USERNAME = process.env.SUPERADMIN_USERNAME
-const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD
-const SUPERADMIN_ID = '11111111-1111-1111-1111-111111111111'
-const SUPERADMIN_EMAIL = 'superadmin@atrium.local'
+// The credential values were previously read from environment variables, but now they are purely database based in the `superadmins` table.
 
 /**
  * Main Auth.js v5 configuration (Node.js runtime).
@@ -41,27 +29,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const email = credentials.email as string
         const password = credentials.password as string
         const isSuperAdminLogin = credentials.isSuperAdminLogin === 'true'
-
-        // Fixed super-admin: username + password from env, checked in code.
-        // No email-domain rule and no DB lookup — this path is intentionally
-        // independent of Google / the `profiles` and `superadmins` tables. The
-        // env guard means the path is inert (login simply fails) if the
-        // credentials aren't configured, so an unset env can never match.
-        if (
-          isSuperAdminLogin &&
-          SUPERADMIN_USERNAME &&
-          SUPERADMIN_PASSWORD &&
-          email === SUPERADMIN_USERNAME &&
-          password === SUPERADMIN_PASSWORD
-        ) {
-          return {
-            id: SUPERADMIN_ID,
-            email: SUPERADMIN_EMAIL,
-            name: 'Super Admin',
-            image: null,
-            isSuperAdminLogin: true,
-          } as any
-        }
 
         // Validate domain (superadmins should also be from nirmauni, but allow exception if needed. Currently required for all.)
         if (!email.endsWith('@nirmauni.ac.in')) return null
@@ -122,13 +89,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const { user } = params
       if (user) {
         token.isSuperAdmin = (user as any).isSuperAdminLogin === true
-        // The fixed super-admin has no email-keyed `profiles` row, so the base
-        // jwt callback can't resolve `token.profileId`. Stamp it from the
-        // synthetic id so `session.user.id` (required by requireSuperAdmin and
-        // the audit/membership writes) is populated.
-        if ((user as any).id === SUPERADMIN_ID) {
-          token.profileId = SUPERADMIN_ID
-        }
       }
 
       return token

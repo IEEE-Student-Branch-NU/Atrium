@@ -106,11 +106,11 @@ export function EditEventForm({ event, branches, eventTypes }: { event: any, bra
   }
 
   // Handle Shadcn Select changes manually for preview since hidden input onChange doesn't bubble in React
-  const handleEventTypeChange = (val: string) => {
-    setPreview(prev => ({ ...prev, eventType: eventTypes.find((et: any) => et.id === val)?.name || '' }))
+  const handleEventTypeChange = (val: string | null) => {
+    setPreview(prev => ({ ...prev, eventType: eventTypes.find((et: any) => et.id === String(val))?.name || '' }))
   }
-  const handleIsFreeChange = (val: string) => {
-    setPreview(prev => ({ ...prev, is_free: val === 'true' }))
+  const handleIsFreeChange = (val: string | null) => {
+    setPreview(prev => ({ ...prev, is_free: String(val) === 'true' }))
   }
 
   return (
@@ -307,13 +307,11 @@ export function EditEventForm({ event, branches, eventTypes }: { event: any, bra
             </div>
             
             <Dialog>
-              <DialogTrigger asChild>
-                <div className="group cursor-pointer rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors">
-                  <p className="text-sm text-muted-foreground line-clamp-3">
-                    {preview.description || 'Add a description to see it appear here...'}
-                  </p>
-                  <p className="text-xs text-primary font-medium mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Read full description</p>
-                </div>
+              <DialogTrigger render={<div className="group cursor-pointer rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors text-left" />}>
+                <p className="text-sm text-muted-foreground line-clamp-3">
+                  {preview.description || 'Add a description to see it appear here...'}
+                </p>
+                <p className="text-xs text-primary font-medium mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Read full description</p>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>

@@ -108,7 +108,7 @@ export function AssignPositionDialog({
                 name="branch_id"
                 value={branchId}
                 onValueChange={(value) => {
-                  setBranchId(value)
+                  setBranchId(String(value))
                   setPositionId('')
                 }}
               >

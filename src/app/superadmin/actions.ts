@@ -192,7 +192,8 @@ export async function removePosition(formData: FormData) {
   const { data: m } = await supabase.from('memberships')
     .select('profile_id, branch_id, position_id, positions(name)').eq('id', membership_id).single()
   
-  if (m?.positions?.name?.toLowerCase().includes('superadmin')) {
+  const positionName = (m?.positions as any)?.name || (m?.positions as any)?.[0]?.name || ''
+  if (positionName.toLowerCase().includes('superadmin')) {
     if (!password || !(await verifySuperAdminPassword(session.user?.email, password))) {
       return { error: 'Incorrect superadmin password' }
     }

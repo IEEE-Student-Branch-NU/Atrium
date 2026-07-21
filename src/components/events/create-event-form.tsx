@@ -47,7 +47,7 @@ export function CreateEventForm({ branches, eventTypes }: { branches: any[], eve
     try {
       await createEvent(data)
       toast.success('Event created successfully as a draft.')
-      router.push('/events')
+      router.push('/events/management')
       router.refresh()
     } catch (error: any) {
       toast.error(error.message || 'Failed to create event.')

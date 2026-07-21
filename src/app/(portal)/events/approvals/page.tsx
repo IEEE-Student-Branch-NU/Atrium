@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button'
 import { approveEvent, rejectEvent } from '../actions'
 import Link from 'next/link'
 import { auth } from '@/auth'
+import { getEffectiveActor } from '@/utils/auth/superadmin'
+import { getUserProfileWithMembership } from '@/lib/queries'
+import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 
 export default async function EventApprovalsPage() {
   const supabase = createAdminClient()
@@ -12,18 +15,17 @@ export default async function EventApprovalsPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
-  // Get user's memberships to check admin roles
-  const { data: memberships } = await supabase
-    .from('memberships')
-    .select('branch_id, portal_role, branches(name)')
-    .eq('profile_id', session.user.id)
-    .is('ended_at', null)
+  const actor = await getEffectiveActor()
+  const profile = await getUserProfileWithMembership(actor.actingProfileId!)
 
-  const adminMemberships = memberships?.filter(
-    (m) => m.portal_role === 'admin' || m.portal_role === 'super_admin'
-  ) || []
+  if (!profile || !profile.branch_id) {
+    redirect('/login')
+  }
 
-  if (adminMemberships.length === 0) {
+  const permissions = await getUserPermissions(supabase, profile.id, profile.branch_id, profile.membership_id)
+  const canApproveEvents = hasPermission(permissions, 'approve_events')
+
+  if (!canApproveEvents) {
     return (
       <div className="p-8 text-center">
         <h1 className="text-2xl font-bold">Unauthorized</h1>
@@ -32,19 +34,13 @@ export default async function EventApprovalsPage() {
     )
   }
 
-  const isSuperAdmin = adminMemberships.some(m => m.portal_role === 'super_admin')
-  const branchIds = adminMemberships.map(m => m.branch_id)
-
-  // Fetch pending events
+  // Fetch pending events for the current branch
   let query = supabase
     .from('events')
     .select('*, branches(name), profiles:creator_id(full_name, email)')
     .eq('status', 'pending_approval')
+    .eq('branch_id', profile.branch_id)
     .order('submitted_at', { ascending: true })
-
-  if (!isSuperAdmin) {
-    query = query.in('branch_id', branchIds)
-  }
 
   const { data: pendingEvents, error } = await query
 
@@ -71,20 +67,28 @@ export default async function EventApprovalsPage() {
                 </div>
               </div>
               
-              <div className="flex gap-2 shrink-0">
-                <form action={async () => {
-                  'use server'
-                  await approveEvent(event.id)
-                }}>
-                  <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">Approve</Button>
-                </form>
-                
-                <form action={async () => {
-                  'use server'
-                  await rejectEvent(event.id)
-                }}>
-                  <Button type="submit" variant="destructive">Reject</Button>
-                </form>
+              <div className="flex gap-2 shrink-0 items-center">
+                {event.creator_id === session.user.id ? (
+                  <span className="text-sm font-medium text-amber-600 bg-amber-500/10 px-3 py-1.5 rounded-md border border-amber-500/20">
+                    Cannot approve own event
+                  </span>
+                ) : (
+                  <>
+                    <form action={async () => {
+                      'use server'
+                      await approveEvent(event.id)
+                    }}>
+                      <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">Approve</Button>
+                    </form>
+                    
+                    <form action={async () => {
+                      'use server'
+                      await rejectEvent(event.id)
+                    }}>
+                      <Button type="submit" variant="destructive">Reject</Button>
+                    </form>
+                  </>
+                )}
               </div>
             </div>
           ))}

@@ -73,8 +73,27 @@ export default async function EventPage({ params }: EventPageProps) {
         )}
       </div>
 
-      <div className="prose dark:prose-invert max-w-none">
-        <p>{event.description}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-2 prose dark:prose-invert max-w-none">
+          <p className="whitespace-pre-wrap">{event.description}</p>
+        </div>
+        
+        <div className="md:col-span-1">
+          {event.banner?.url ? (
+            <div className="aspect-[3/4] relative rounded-xl overflow-hidden border bg-muted/10 shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={event.banner.url} 
+                alt={`${event.name} poster`} 
+                className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+          ) : (
+            <div className="aspect-[3/4] relative rounded-xl border border-dashed bg-muted/30 flex flex-col items-center justify-center text-muted-foreground">
+              <span className="text-sm">No Poster</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {isAdmin && (

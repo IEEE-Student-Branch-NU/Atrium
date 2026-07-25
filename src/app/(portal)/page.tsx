@@ -286,7 +286,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Recent Activity</CardTitle>
             <CardDescription>Latest changes across the portal</CardDescription>
           </CardHeader>
-          <CardContent className="max-h-[360px] overflow-y-auto pr-4 space-y-3 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+          <CardContent className="max-h-[280px] overflow-y-auto pr-4 space-y-3 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
             {recentActivity.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Clock className="h-8 w-8 text-muted-foreground/30" />

@@ -11,6 +11,7 @@ import { CalendarIcon, Edit, Image as ImageIcon, Send } from 'lucide-react'
 import Link from 'next/link'
 import { submitEvent } from '../actions'
 import { SubmitButton } from './submit-button'
+import { DeleteButton } from './delete-button'
 
 export default async function EventManagementPage() {
   const session = await auth()
@@ -132,6 +133,9 @@ function EventCard({ event }: { event: any }) {
             <Edit className="w-3 h-3" /> Edit
           </Button>
         </Link>
+        {(event.status === 'draft' || event.status === 'published' || event.status === 'rejected') && (
+          <DeleteButton eventId={event.id} eventName={event.name} />
+        )}
         {event.status === 'draft' && (
           <div className="flex-1">
             <SubmitButton eventId={event.id} />

@@ -39,7 +39,6 @@ export function ApprovalsClient({
             <EventApprovalCard
               key={event.id}
               event={event}
-              isOwnEvent={event.creator_id === currentUserId}
               onAction={() => router.refresh()}
             />
           ))}
@@ -55,11 +54,9 @@ export function ApprovalsClient({
 
 function EventApprovalCard({
   event,
-  isOwnEvent,
   onAction,
 }: {
   event: PendingEvent
-  isOwnEvent: boolean
   onAction: () => void
 }) {
   const [showNotes, setShowNotes] = useState(false)
@@ -126,41 +123,33 @@ function EventApprovalCard({
         </div>
         
         <div className="flex gap-2 shrink-0 items-center flex-wrap">
-          {isOwnEvent ? (
-            <Badge variant="outline" className="text-amber-600 bg-amber-500/10 border-amber-500/20 px-3 py-1.5">
-              Cannot approve own event
-            </Badge>
-          ) : (
-            <>
-              {/* Approve → publishes the event */}
-              <Button
-                onClick={handleApprove}
-                disabled={loading !== null}
-                className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
-              >
-                <Check className="h-4 w-4" />
-                {loading === 'approve' ? 'Approving...' : 'Approve & Publish'}
-              </Button>
+          {/* Approve → publishes the event */}
+          <Button
+            onClick={handleApprove}
+            disabled={loading !== null}
+            className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+          >
+            <Check className="h-4 w-4" />
+            {loading === 'approve' ? 'Approving...' : 'Approve & Publish'}
+          </Button>
 
-              {/* Edit directly */}
-              <Link href={`/events/${event.id}/edit`}>
-                <Button variant="outline" className="gap-1.5">
-                  <Edit className="h-4 w-4" />
-                  Edit
-                </Button>
-              </Link>
+          {/* Edit directly */}
+          <Link href={`/events/${event.id}/edit`}>
+            <Button variant="outline" className="gap-1.5">
+              <Edit className="h-4 w-4" />
+              Edit
+            </Button>
+          </Link>
 
-              {/* Send back to draft with notes */}
-              <Button
-                variant="outline"
-                onClick={() => setShowNotes(!showNotes)}
-                className="gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
-              >
-                <MessageSquare className="h-4 w-4" />
-                Send Back
-              </Button>
-            </>
-          )}
+          {/* Send back to draft with notes */}
+          <Button
+            variant="outline"
+            onClick={() => setShowNotes(!showNotes)}
+            className="gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-500/10"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Send Back
+          </Button>
         </div>
       </div>
 

@@ -215,7 +215,7 @@ export async function approveEvent(id: string, comment?: string) {
   const supabase = createAdminClient()
   const session = await auth()
   
-  // Fetch event first to check creator
+  // Fetch event first
   const { data: existingEvent, error: fetchError } = await supabase
     .from('events')
     .select('creator_id')
@@ -223,10 +223,6 @@ export async function approveEvent(id: string, comment?: string) {
     .single()
 
   if (fetchError) throw fetchError
-
-  if (session?.user?.id && existingEvent.creator_id === session.user.id) {
-    throw new Error('You cannot approve your own event.')
-  }
 
   const { data: event, error } = await supabase
     .from('events')
@@ -273,7 +269,7 @@ export async function rejectEvent(id: string, comment?: string) {
   const supabase = createAdminClient()
   const session = await auth()
   
-  // Fetch event first to check creator
+  // Fetch event first
   const { data: existingEvent, error: fetchError } = await supabase
     .from('events')
     .select('creator_id')
@@ -281,10 +277,6 @@ export async function rejectEvent(id: string, comment?: string) {
     .single()
 
   if (fetchError) throw fetchError
-
-  if (session?.user?.id && existingEvent.creator_id === session.user.id) {
-    throw new Error('You cannot reject your own event.')
-  }
 
   // Send back to draft so creator can revise and resubmit
   const { data: event, error } = await supabase

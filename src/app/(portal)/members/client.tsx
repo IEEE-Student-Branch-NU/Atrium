@@ -55,10 +55,12 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 
 export function MembersDirectoryClient({ 
   members, 
-  branches 
+  branches,
+  canManageMembers = false
 }: { 
   members: DirectoryMember[]
   branches: string[]
+  canManageMembers?: boolean
 }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
@@ -209,24 +211,27 @@ export function MembersDirectoryClient({
                 className="group hover:border-primary/30 transition-colors cursor-pointer h-full relative"
                 onClick={() => router.push(`/members/${member.id}`)}
               >
-                <div className="absolute top-2 right-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger render={
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()} />
-                    }>
-                      <MoreVertical className="h-4 w-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenuItem onClick={() => {
-                        setEditingMember(member)
-                        setIsModalOpen(true)
-                      }}>
-                        <Calendar className="mr-2 h-4 w-4" />
-                        Edit Expiry Date
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                {canManageMembers && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()} />
+                      }>
+                        <MoreVertical className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingMember(member)
+                          setIsModalOpen(true)
+                        }}>
+                          <Calendar className="mr-2 h-4 w-4" />
+                          Edit Expiry Date
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
                 <CardContent className="p-4 space-y-3">
                   {/* Top: Avatar + Name + Position */}
                   <div className="flex items-start gap-3 pr-8">

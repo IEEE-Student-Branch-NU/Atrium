@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logAdminAction } from '@/utils/auth/audit'
 import { auth } from '@/auth'
 import { processImage } from '@/lib/images/processor'
 import { uploadToImageKit, deleteFromImageKit } from '@/lib/images/imagekit'
@@ -50,12 +51,22 @@ export async function createEvent(data: any) {
     }
   }
 
+  await logAdminAction({
+    actorProfileId: session.user.id,
+    action: 'event_drafted',
+    entityType: 'event',
+    entityId: event.id,
+    branchId: event.branch_id,
+    summary: `Drafted event "${event.name}"`
+  })
+
   revalidatePath('/events')
   return event
 }
 
 export async function updateEvent(id: string, data: any) {
   const supabase = createAdminClient()
+  const session = await auth()
   
   const { end_date, is_free, registration_url, banner, banner_file, ...rest } = data
 
@@ -109,6 +120,18 @@ export async function updateEvent(id: string, data: any) {
     .single()
 
   if (error) throw error
+  
+  if (session?.user?.id) {
+    await logAdminAction({
+      actorProfileId: session.user.id,
+      action: 'edited',
+      entityType: 'event',
+      entityId: event.id,
+      branchId: event.branch_id,
+      summary: `Updated event "${event.name}"`
+    })
+  }
+
   revalidatePath('/events')
   revalidatePath(`/events/${id}`)
   return event
@@ -116,6 +139,9 @@ export async function updateEvent(id: string, data: any) {
 
 export async function deleteEvent(id: string) {
   const supabase = createAdminClient()
+  const session = await auth()
+  
+  const { data: event, error: fetchError } = await supabase.from('events').select('branch_id, name').eq('id', id).single()
   
   const { error } = await supabase
     .from('events')
@@ -123,11 +149,24 @@ export async function deleteEvent(id: string) {
     .eq('id', id)
 
   if (error) throw error
+
+  if (session?.user?.id && !fetchError && event) {
+    await logAdminAction({
+      actorProfileId: session.user.id,
+      action: 'deleted',
+      entityType: 'event',
+      entityId: id,
+      branchId: event.branch_id,
+      summary: `Deleted event "${event.name}"`
+    })
+  }
+
   revalidatePath('/events')
 }
 
 export async function submitEvent(id: string) {
   const supabase = createAdminClient()
+  const session = await auth()
   
   const { data: event, error } = await supabase
     .from('events')
@@ -154,6 +193,17 @@ export async function submitEvent(id: string) {
       type: 'warning'
     }))
     await supabase.from('notifications').insert(notifications)
+  }
+  
+  if (session?.user?.id) {
+    await logAdminAction({
+      actorProfileId: session.user.id,
+      action: 'submitted',
+      entityType: 'event',
+      entityId: event.id,
+      branchId: event.branch_id,
+      summary: `Submitted event "${event.name}" for approval`
+    })
   }
   
   revalidatePath('/events')
@@ -195,6 +245,15 @@ export async function approveEvent(id: string, comment?: string) {
       decision: 'approved',
       comment
     })
+    
+    await logAdminAction({
+      actorProfileId: session.user.id,
+      action: 'event_permitted',
+      entityType: 'event',
+      entityId: event.id,
+      branchId: event.branch_id,
+      summary: `Approved event "${event.name}"`
+    })
   }
 
   // Notify creator
@@ -227,9 +286,10 @@ export async function rejectEvent(id: string, comment?: string) {
     throw new Error('You cannot reject your own event.')
   }
 
+  // Send back to draft so creator can revise and resubmit
   const { data: event, error } = await supabase
     .from('events')
-    .update({ status: 'rejected' })
+    .update({ status: 'draft' })
     .eq('id', id)
     .select()
     .single()
@@ -244,14 +304,60 @@ export async function rejectEvent(id: string, comment?: string) {
       decision: 'rejected',
       comment
     })
+
+    await logAdminAction({
+      actorProfileId: session.user.id,
+      action: 'rejected',
+      entityType: 'event',
+      entityId: event.id,
+      branchId: event.branch_id,
+      summary: `Sent event "${event.name}" back to draft${comment ? `: ${comment}` : ''}`
+    })
+  }
+
+  // Notify creator with notes
+  await supabase.from('notifications').insert({
+    profile_id: event.creator_id,
+    title: 'Event Sent Back for Revision',
+    message: `Your event "${event.name}" needs changes before it can be approved.${comment ? ` Notes: ${comment}` : ''}`,
+    type: 'warning'
+  })
+
+  revalidatePath('/events')
+  revalidatePath(`/events/${id}`)
+  return event
+}
+
+export async function publishEvent(id: string) {
+  const supabase = createAdminClient()
+  const session = await auth()
+
+  const { data: event, error } = await supabase
+    .from('events')
+    .update({ status: 'published', published_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  if (session?.user?.id) {
+    await logAdminAction({
+      actorProfileId: session.user.id,
+      action: 'published',
+      entityType: 'event',
+      entityId: event.id,
+      branchId: event.branch_id,
+      summary: `Published event "${event.name}"`
+    })
   }
 
   // Notify creator
   await supabase.from('notifications').insert({
     profile_id: event.creator_id,
-    title: 'Event Rejected',
-    message: `Your event "${event.name}" was rejected.${comment ? ` Reason: ${comment}` : ''}`,
-    type: 'error'
+    title: 'Event Published',
+    message: `Your event "${event.name}" is now live and visible to everyone!`,
+    type: 'success'
   })
 
   revalidatePath('/events')

@@ -4,7 +4,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 export type AdminAction = {
   actorProfileId: string
   action: string
-  entityType: 'organization' | 'branch' | 'position' | 'user' | 'membership' | 'permission' | 'workspace'
+  entityType: 'organization' | 'branch' | 'position' | 'user' | 'membership' | 'permission' | 'workspace' | 'event'
   entityId?: string | null
   branchId?: string | null
   summary: string

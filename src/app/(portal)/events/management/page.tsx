@@ -7,8 +7,10 @@ import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CalendarIcon, Edit, Image as ImageIcon } from 'lucide-react'
+import { CalendarIcon, Edit, Image as ImageIcon, Send } from 'lucide-react'
 import Link from 'next/link'
+import { submitEvent } from '../actions'
+import { SubmitButton } from './submit-button'
 
 export default async function EventManagementPage() {
   const session = await auth()
@@ -130,6 +132,11 @@ function EventCard({ event }: { event: any }) {
             <Edit className="w-3 h-3" /> Edit
           </Button>
         </Link>
+        {event.status === 'draft' && (
+          <div className="flex-1">
+            <SubmitButton eventId={event.id} />
+          </div>
+        )}
       </div>
     </div>
   )

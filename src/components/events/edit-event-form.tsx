@@ -277,12 +277,11 @@ export function EditEventForm({ event, branches, eventTypes }: { event: any, bra
                 </Badge>
               </div>
               <div className="flex gap-2">
-                {(event.status === 'draft' || event.status === 'published' || event.status === 'rejected') && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" type="button" className="text-red-600 border-red-500/30 hover:bg-red-500/10 hover:text-red-700">Delete Event</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" type="button" className="text-red-600 border-red-500/30 hover:bg-red-500/10 hover:text-red-700">Delete Event</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
@@ -312,7 +311,6 @@ export function EditEventForm({ event, branches, eventTypes }: { event: any, bra
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-                )}
                 <Button variant="outline" type="button" onClick={() => router.back()}>Cancel</Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Updating...' : 'Save Changes'}

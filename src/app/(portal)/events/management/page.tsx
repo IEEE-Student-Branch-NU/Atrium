@@ -133,9 +133,7 @@ function EventCard({ event }: { event: any }) {
             <Edit className="w-3 h-3" /> Edit
           </Button>
         </Link>
-        {(event.status === 'draft' || event.status === 'published' || event.status === 'rejected') && (
-          <DeleteButton eventId={event.id} eventName={event.name} />
-        )}
+        <DeleteButton eventId={event.id} eventName={event.name} />
         {event.status === 'draft' && (
           <div className="flex-1">
             <SubmitButton eventId={event.id} />

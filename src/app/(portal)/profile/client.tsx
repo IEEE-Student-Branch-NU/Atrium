@@ -130,7 +130,24 @@ function EditProfileDialog({ profile }: { profile: FullUserProfile }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
-            <Input id="phone" name="phone" defaultValue={profile.phone ?? ''} placeholder="+91 98765 43210" />
+            <div className="flex">
+              <div className="flex items-center px-3 border border-r-0 border-input bg-muted rounded-l-md text-sm text-muted-foreground font-medium">
+                +91
+              </div>
+              <Input 
+                id="phone" 
+                name="phone" 
+                defaultValue={profile.phone?.replace(/[^\d]/g, '').replace(/^91/, '') ?? ''} 
+                placeholder="9876543210"
+                pattern="\d{10}"
+                title="Format: 10 digit mobile number"
+                maxLength={10}
+                className="rounded-l-none"
+                onChange={(e) => {
+                  e.target.value = e.target.value.replace(/[^\d]/g, '').substring(0, 10);
+                }}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="bio">Bio</Label>

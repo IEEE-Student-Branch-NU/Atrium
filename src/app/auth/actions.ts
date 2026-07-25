@@ -102,12 +102,18 @@ export async function signUp(formData: FormData) {
     return { error: 'Passwords do not match.' }
   }
 
-  if (!/^\d{6,12}$/.test(ieeeMembershipId)) {
-    return { error: 'IEEE Membership ID must be 6-12 digits.' }
+  if (!/^\d{9}$/.test(ieeeMembershipId)) {
+    return { error: 'IEEE Membership ID must be exactly 9 digits.' }
   }
 
-  if (!/^\+91\s\d{5}\s\d{5}$/.test(phone)) {
-    return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
+  // Prepend +91 if the user typed exactly 10 digits
+  let formattedPhone = phone
+  if (/^\d{10}$/.test(phone)) {
+    formattedPhone = `+91 ${phone.substring(0, 5)} ${phone.substring(5)}`
+  }
+
+  if (!/^\+91\s\d{5}\s\d{5}$/.test(formattedPhone)) {
+    return { error: 'Phone number must be a valid 10-digit Indian mobile number.' }
   }
 
   const supabase = createAdminClient()
@@ -152,7 +158,7 @@ export async function signUp(formData: FormData) {
     email,
     full_name: fullName,
     password_hash: passwordHash,
-    phone: phone || null,
+    phone: formattedPhone || null,
     ieee_membership_id: ieeeMembershipId,
     section,
     status: newStatus,
@@ -207,12 +213,18 @@ export async function completeRegistration(formData: FormData) {
     return { error: 'All required fields must be filled.' }
   }
 
-  if (!/^\d{6,12}$/.test(ieeeMembershipId)) {
-    return { error: 'IEEE Membership ID must be 6-12 digits.' }
+  if (!/^\d{9}$/.test(ieeeMembershipId)) {
+    return { error: 'IEEE Membership ID must be exactly 9 digits.' }
   }
 
-  if (!/^\+91\s?\d{5}\s?\d{5}$/.test(phone)) {
-    return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
+  // Prepend +91 if the user typed exactly 10 digits
+  let formattedPhone = phone
+  if (/^\d{10}$/.test(phone)) {
+    formattedPhone = `+91 ${phone.substring(0, 5)} ${phone.substring(5)}`
+  }
+
+  if (!/^\+91\s?\d{5}\s?\d{5}$/.test(formattedPhone)) {
+    return { error: 'Phone number must be a valid 10-digit Indian mobile number.' }
   }
 
   const supabase = createAdminClient()
@@ -229,7 +241,7 @@ export async function completeRegistration(formData: FormData) {
   const { error: profileError } = await supabase
     .from('profiles')
     .update({
-      phone: phone || null,
+      phone: formattedPhone || null,
       ieee_membership_id: ieeeMembershipId,
       section,
       status: newStatus,

@@ -29,8 +29,15 @@ export async function updateProfile(formData: FormData) {
     return { error: 'Full name is required (at least 2 characters).' }
   }
 
-  if (phone && !/^\+91\s?\d{5}\s?\d{5}$/.test(phone)) {
-    return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
+  let formattedPhone = phone
+  if (phone) {
+    if (/^\d{10}$/.test(phone)) {
+      formattedPhone = `+91 ${phone.substring(0, 5)} ${phone.substring(5)}`
+    }
+    
+    if (!/^\+91\s\d{5}\s\d{5}$/.test(formattedPhone)) {
+      return { error: 'Phone number must be a valid 10-digit Indian mobile number.' }
+    }
   }
 
   const supabase = createAdminClient()
@@ -39,7 +46,7 @@ export async function updateProfile(formData: FormData) {
     .from('profiles')
     .update({
       full_name: fullName.trim(),
-      phone: phone || null,
+      phone: formattedPhone || null,
       bio: bio || null,
       skills: skills && skills.length > 0 ? skills : null,
     })

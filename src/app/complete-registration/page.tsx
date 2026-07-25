@@ -76,10 +76,11 @@ export default function CompleteRegistrationPage() {
                   id="ieeeMembershipId"
                   name="ieeeMembershipId"
                   type="text"
-                  placeholder="e.g. 123456789"
+                  placeholder="e.g. 102064653"
                   required
-                  pattern="\d{6,12}"
-                  title="Must be 6-12 digits"
+                  pattern="\d{9}"
+                  maxLength={9}
+                  title="Must be exactly 9 digits"
                 />
                 <p className="text-xs text-muted-foreground">
                   Found on your IEEE membership card (Member #)
@@ -137,27 +138,25 @@ export default function CompleteRegistrationPage() {
                   <Label htmlFor="phone">
                     Phone <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    placeholder="+91 XXXXX XXXXX"
-                    required
-                    pattern="\+91\s\d{5}\s\d{5}"
-                    title="Format: +91 XXXXX XXXXX"
-                    onChange={(e) => {
-                      let val = e.target.value.replace(/[^\d]/g, '');
-                      // Only strip a leading "91" when it's the country code
-                      // (i.e. there are extra digits). A valid 10-digit mobile
-                      // can itself start with 91, so don't chop it.
-                      if (val.length > 10 && val.startsWith('91')) val = val.substring(2);
-                      if (val.length > 10) val = val.substring(0, 10);
-                      let formatted = val.length > 0 ? '+91' : '';
-                      if (val.length > 0) formatted += ' ' + val.substring(0, 5);
-                      if (val.length > 5) formatted += ' ' + val.substring(5, 10);
-                      e.target.value = formatted;
-                    }}
-                  />
+                  <div className="flex">
+                    <div className="flex items-center px-3 border border-r-0 border-input bg-muted rounded-l-md text-sm text-muted-foreground font-medium">
+                      +91
+                    </div>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      placeholder="9876543210"
+                      required
+                      pattern="\d{10}"
+                      title="Format: 10 digit mobile number"
+                      maxLength={10}
+                      className="rounded-l-none"
+                      onChange={(e) => {
+                        e.target.value = e.target.value.replace(/[^\d]/g, '').substring(0, 10);
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="section">IEEE Section</Label>

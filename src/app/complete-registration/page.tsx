@@ -146,14 +146,18 @@ export default function CompleteRegistrationPage() {
                       id="phone"
                       name="phone"
                       type="tel"
-                      placeholder="9876543210"
+                      placeholder="98765 43210"
                       required
-                      pattern="\d{10}"
+                      pattern="\d{5}\s\d{5}"
                       title="Format: 10 digit mobile number"
-                      maxLength={10}
+                      maxLength={11}
                       className="rounded-l-none"
                       onChange={(e) => {
-                        e.target.value = e.target.value.replace(/[^\d]/g, '').substring(0, 10);
+                        let val = e.target.value.replace(/[^\d]/g, '').substring(0, 10);
+                        if (val.length > 5) {
+                          val = val.substring(0, 5) + ' ' + val.substring(5);
+                        }
+                        e.target.value = val;
                       }}
                     />
                   </div>

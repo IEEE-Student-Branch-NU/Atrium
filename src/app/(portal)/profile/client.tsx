@@ -137,14 +137,24 @@ function EditProfileDialog({ profile }: { profile: FullUserProfile }) {
               <Input 
                 id="phone" 
                 name="phone" 
-                defaultValue={profile.phone?.replace(/[^\d]/g, '').replace(/^91/, '') ?? ''} 
-                placeholder="9876543210"
-                pattern="\d{10}"
+                defaultValue={
+                  (() => {
+                    const val = profile.phone?.replace(/[^\d]/g, '').replace(/^91/, '') ?? '';
+                    if (val.length > 5) return val.substring(0, 5) + ' ' + val.substring(5);
+                    return val;
+                  })()
+                } 
+                placeholder="98765 43210"
+                pattern="\d{5}\s\d{5}"
                 title="Format: 10 digit mobile number"
-                maxLength={10}
+                maxLength={11}
                 className="rounded-l-none"
                 onChange={(e) => {
-                  e.target.value = e.target.value.replace(/[^\d]/g, '').substring(0, 10);
+                  let val = e.target.value.replace(/[^\d]/g, '').substring(0, 10);
+                  if (val.length > 5) {
+                    val = val.substring(0, 5) + ' ' + val.substring(5);
+                  }
+                  e.target.value = val;
                 }}
               />
             </div>

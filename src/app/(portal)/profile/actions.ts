@@ -31,8 +31,9 @@ export async function updateProfile(formData: FormData) {
 
   let formattedPhone = phone
   if (phone) {
-    if (/^\d{10}$/.test(phone)) {
-      formattedPhone = `+91 ${phone.substring(0, 5)} ${phone.substring(5)}`
+    const rawDigits = phone.replace(/[^\d]/g, '')
+    if (rawDigits.length === 10) {
+      formattedPhone = `+91 ${rawDigits.substring(0, 5)} ${rawDigits.substring(5)}`
     }
     
     if (!/^\+91\s\d{5}\s\d{5}$/.test(formattedPhone)) {

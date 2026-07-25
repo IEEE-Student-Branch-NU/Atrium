@@ -106,10 +106,11 @@ export async function signUp(formData: FormData) {
     return { error: 'IEEE Membership ID must be exactly 9 digits.' }
   }
 
-  // Prepend +91 if the user typed exactly 10 digits
+  // Handle 10 digits with or without space
   let formattedPhone = phone
-  if (/^\d{10}$/.test(phone)) {
-    formattedPhone = `+91 ${phone.substring(0, 5)} ${phone.substring(5)}`
+  const rawDigits = phone.replace(/[^\d]/g, '')
+  if (rawDigits.length === 10) {
+    formattedPhone = `+91 ${rawDigits.substring(0, 5)} ${rawDigits.substring(5)}`
   }
 
   if (!/^\+91\s\d{5}\s\d{5}$/.test(formattedPhone)) {
@@ -217,10 +218,11 @@ export async function completeRegistration(formData: FormData) {
     return { error: 'IEEE Membership ID must be exactly 9 digits.' }
   }
 
-  // Prepend +91 if the user typed exactly 10 digits
+  // Handle 10 digits with or without space
   let formattedPhone = phone
-  if (/^\d{10}$/.test(phone)) {
-    formattedPhone = `+91 ${phone.substring(0, 5)} ${phone.substring(5)}`
+  const rawDigits = phone.replace(/[^\d]/g, '')
+  if (rawDigits.length === 10) {
+    formattedPhone = `+91 ${rawDigits.substring(0, 5)} ${rawDigits.substring(5)}`
   }
 
   if (!/^\+91\s?\d{5}\s?\d{5}$/.test(formattedPhone)) {

@@ -134,6 +134,9 @@ export async function rejectRegistration(profileId: string, reason: string) {
     .update({
       status: 'rejected',
       rejected_reason: reason.trim(),
+      approved_by: session.user.id,
+      approved_by_position: profile.position_name || (session.isSuperAdmin ? 'Superadmin' : 'Admin'),
+      approved_at: new Date().toISOString(), // Track when it was rejected
     })
     .in('status', ['pending', 'under_review']) // Allow rejecting from pending or under_review
     .eq('id', profileId)

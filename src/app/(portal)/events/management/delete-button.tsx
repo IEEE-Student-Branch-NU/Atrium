@@ -37,17 +37,19 @@ export function DeleteButton({ eventId, eventName }: { eventId: string; eventNam
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="flex-1 flex items-center gap-2 text-red-600 border-red-500/30 hover:bg-red-500/10 hover:text-red-700"
-          disabled={isDeleting}
-        >
-          <Trash2 className="w-3 h-3" /> 
-          {isDeleting ? 'Deleting...' : 'Delete'}
-        </Button>
-      </AlertDialogTrigger>
+      <AlertDialogTrigger 
+        render={
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 flex items-center gap-2 text-red-600 border-red-500/30 hover:bg-red-500/10 hover:text-red-700"
+            disabled={isDeleting}
+          >
+            <Trash2 className="w-3 h-3" /> 
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        } 
+      />
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

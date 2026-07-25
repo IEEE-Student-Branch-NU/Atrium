@@ -278,9 +278,11 @@ export function EditEventForm({ event, branches, eventTypes }: { event: any, bra
               </div>
               <div className="flex gap-2">
                 <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" type="button" className="text-red-600 border-red-500/30 hover:bg-red-500/10 hover:text-red-700">Delete Event</Button>
-                  </AlertDialogTrigger>
+                  <AlertDialogTrigger 
+                    render={
+                      <Button variant="outline" type="button" className="text-red-600 border-red-500/30 hover:bg-red-500/10 hover:text-red-700">Delete Event</Button>
+                    } 
+                  />
                   <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

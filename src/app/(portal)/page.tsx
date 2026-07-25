@@ -218,7 +218,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Quick Actions + Recent Activity */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 items-start">
         {/* Quick Actions */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm lg:col-span-1">
           <CardHeader>

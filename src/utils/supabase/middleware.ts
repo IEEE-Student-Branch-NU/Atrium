@@ -6,7 +6,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 const { auth } = NextAuth(authConfig)
 
 // Routes that don't require authentication at all
-const PUBLIC_ROUTES = ['/login', '/signup', '/superadmin/login', '/api/auth']
+const PUBLIC_ROUTES = ['/login', '/signup', '/superadmin/login', '/api/auth', '/api/public']
 
 // Routes that require auth but NOT approval
 const AUTH_ONLY_ROUTES = ['/pending', '/rejected', '/complete-registration']

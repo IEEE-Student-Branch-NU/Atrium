@@ -7,11 +7,23 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { updateEvent } from '@/app/(portal)/events/actions'
+import { updateEvent, submitEvent, deleteEvent } from '@/app/(portal)/events/actions'
 import { toast } from 'sonner'
 import { CalendarIcon, MapPin, Users, Mail, Image as ImageIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 export function EditEventForm({ event, branches, eventTypes }: { event: any, branches: any[], eventTypes: any[] }) {
   const router = useRouter()
@@ -257,11 +269,76 @@ export function EditEventForm({ event, branches, eventTypes }: { event: any, bra
               <p className="text-xs text-muted-foreground">You can also upload files later from the event dashboard.</p>
             </div>
 
-            <div className="flex justify-end gap-4 pt-4 border-t border-border/50">
-              <Button variant="outline" type="button" onClick={() => router.back()}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Updating...' : 'Save Changes'}
-              </Button>
+            <div className="flex items-center justify-between gap-4 pt-4 border-t border-border/50">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Status:</span>
+                <Badge variant="outline" className="text-xs capitalize">
+                  {event.status.replace(/_/g, ' ')}
+                </Badge>
+              </div>
+              <div className="flex gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" type="button" className="text-red-600 border-red-500/30 hover:bg-red-500/10 hover:text-red-700">Delete Event</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the event <strong>"{event.name}"</strong> and remove it from our servers.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                          onClick={async (e) => {
+                            e.preventDefault()
+                            setIsSubmitting(true)
+                            try {
+                              await deleteEvent(event.id)
+                              toast.success('Event deleted successfully.')
+                              router.push('/events/management')
+                              router.refresh()
+                            } catch (err: any) {
+                              toast.error(err.message || 'Failed to delete event')
+                              setIsSubmitting(false)
+                            }
+                          }}
+                        >
+                          Delete Event
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                <Button variant="outline" type="button" onClick={() => router.back()}>Cancel</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Updating...' : 'Save Changes'}
+                </Button>
+                {event.status === 'draft' && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    disabled={isSubmitting}
+                    onClick={async () => {
+                      setIsSubmitting(true)
+                      try {
+                        await submitEvent(event.id)
+                        toast.success('Event submitted for approval!')
+                        router.push('/events/management')
+                        router.refresh()
+                      } catch (err: any) {
+                        toast.error(err.message || 'Failed to submit event')
+                      } finally {
+                        setIsSubmitting(false)
+                      }
+                    }}
+                  >
+                    Submit for Approval
+                  </Button>
+                )}
+              </div>
             </div>
 
           </form>
@@ -307,7 +384,7 @@ export function EditEventForm({ event, branches, eventTypes }: { event: any, bra
             </div>
             
             <Dialog>
-              <DialogTrigger render={<div className="group cursor-pointer rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors text-left" />}>
+              <DialogTrigger render={<button type="button" className="group cursor-pointer rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors text-left w-full" />}>
                 <p className="text-sm text-muted-foreground line-clamp-3">
                   {preview.description || 'Add a description to see it appear here...'}
                 </p>

@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { getUserProfileWithMembership } from '@/lib/queries'
 import { notifyUser } from '@/lib/notifications'
+import { logAdminAction } from '@/utils/auth/audit'
 
 export async function approveRegistration(profileId: string) {
   const session = await auth()
@@ -52,6 +53,15 @@ export async function approveRegistration(profileId: string) {
       event: 'registration.approved',
       params: { name: updated[0].full_name },
       actorProfileId: session.user.id,
+    })
+
+    await logAdminAction({
+      actorProfileId: session.user.id,
+      action: 'member_added',
+      entityType: 'user',
+      entityId: profileId,
+      branchId: profile.branch_id,
+      summary: `Approved registration for "${updated[0].full_name}"`
     })
   }
 
@@ -124,6 +134,9 @@ export async function rejectRegistration(profileId: string, reason: string) {
     .update({
       status: 'rejected',
       rejected_reason: reason.trim(),
+      approved_by: session.user.id,
+      approved_by_position: profile.position_name || (session.isSuperAdmin ? 'Superadmin' : 'Admin'),
+      approved_at: new Date().toISOString(), // Track when it was rejected
     })
     .in('status', ['pending', 'under_review']) // Allow rejecting from pending or under_review
     .eq('id', profileId)

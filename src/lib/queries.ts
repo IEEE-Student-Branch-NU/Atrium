@@ -57,22 +57,29 @@ export interface ActivityItem {
   changed_by_name: string | null
 }
 
-export async function getRecentActivity(limit = 10): Promise<ActivityItem[]> {
+export async function getRecentActivity(limit = 10, branchId?: string): Promise<ActivityItem[]> {
   const supabase = createAdminClient()
 
-  const { data } = await supabase
-    .from('event_audit_log')
-    .select('id, action, event_id, details, created_at, profiles!event_audit_log_changed_by_fkey(full_name)')
+  let query = supabase
+    .from('audit_log')
+    .select('id, action, entity_type, entity_id, summary, details, created_at, profiles!audit_log_actor_profile_id_fkey(full_name)')
+    .in('entity_type', ['event', 'user', 'membership']) // Filter out superadmin actions
     .order('created_at', { ascending: false })
     .limit(limit)
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { data } = await query
 
   if (!data) return []
 
   return data.map((item) => ({
     id: item.id,
     action: item.action,
-    event_id: item.event_id,
-    details: item.details as Record<string, unknown> | null,
+    event_id: item.entity_type === 'event' ? item.entity_id : null,
+    details: { summary: item.summary, ...((item.details as any) || {}) },
     created_at: item.created_at,
     changed_by_name: (item.profiles as any)?.full_name ?? null,
   }))

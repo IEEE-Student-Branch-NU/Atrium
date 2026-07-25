@@ -45,14 +45,20 @@ function timeAgo(dateStr: string): string {
 function actionLabel(action: string): string {
   const labels: Record<string, string> = {
     created: 'created an event',
-    submitted: 'submitted for approval',
+    submitted: 'submitted an event for approval',
     approved: 'approved an event',
     rejected: 'rejected an event',
     published: 'published an event',
     deleted: 'deleted an event',
     edited: 'edited an event',
+    member_added: 'approved a new member',
+    position_assigned: 'assigned a position',
+    permission_granted: 'granted a permission',
+    workspace_created: 'created a workspace',
+    event_drafted: 'drafted an event',
+    event_permitted: 'permitted an event'
   }
-  return labels[action] || action
+  return labels[action] || action.replace('_', ' ')
 }
 
 function actionColor(action: string): string {
@@ -64,6 +70,12 @@ function actionColor(action: string): string {
     published: 'bg-violet-500/10 text-violet-500',
     deleted: 'bg-red-500/10 text-red-500',
     edited: 'bg-sky-500/10 text-sky-500',
+    member_added: 'bg-emerald-500/10 text-emerald-500',
+    position_assigned: 'bg-blue-500/10 text-blue-500',
+    permission_granted: 'bg-amber-500/10 text-amber-500',
+    workspace_created: 'bg-indigo-500/10 text-indigo-500',
+    event_drafted: 'bg-blue-500/10 text-blue-500',
+    event_permitted: 'bg-emerald-500/10 text-emerald-500',
   }
   return colors[action] || 'bg-muted text-muted-foreground'
 }
@@ -90,7 +102,7 @@ export default async function DashboardPage() {
   }
 
   const stats = await getDashboardStats(profile.branch_id ?? undefined)
-  const recentActivity = await getRecentActivity(8)
+  const recentActivity = await getRecentActivity(25, profile.branch_id ?? undefined)
 
   const canCreateEvents = hasPermission(permissions, 'create_events')
   const canApproveRegs = hasPermission(permissions, 'approve_registrations')
@@ -206,7 +218,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Quick Actions + Recent Activity */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 items-start">
         {/* Quick Actions */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm lg:col-span-1">
           <CardHeader>
@@ -274,7 +286,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Recent Activity</CardTitle>
             <CardDescription>Latest changes across the portal</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-h-[280px] overflow-y-auto pr-4 space-y-3 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
             {recentActivity.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Clock className="h-8 w-8 text-muted-foreground/30" />
@@ -283,7 +295,7 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <>
                 {recentActivity.map((item) => (
                   <div
                     key={item.id}
@@ -299,18 +311,22 @@ export default async function DashboardPage() {
                         <span className="font-medium">{item.changed_by_name ?? 'Someone'}</span>{' '}
                         <span className="text-muted-foreground">{actionLabel(item.action)}</span>
                       </p>
-                      {item.details && (item.details as any).name && (
+                      {item.details && (item.details as any).summary ? (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {(item.details as any).summary}
+                        </p>
+                      ) : item.details && (item.details as any).name ? (
                         <p className="truncate text-xs text-muted-foreground">
                           {(item.details as any).name}
                         </p>
-                      )}
+                      ) : null}
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {timeAgo(item.created_at)}
                     </span>
                   </div>
                 ))}
-              </div>
+              </>
             )}
           </CardContent>
         </Card>

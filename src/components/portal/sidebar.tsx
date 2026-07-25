@@ -103,7 +103,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'System',
     items: [
       { label: 'Audit Log', href: '/audit', icon: ScrollText, permission: 'view_audit_log' },
-      { label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'approve_registrations' },
+      { label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'manage_members' },
     ],
   },
 ]
@@ -176,7 +176,7 @@ function RoleSwitcher({
 
   if (collapsed) {
     return (
-      <div className="px-2 py-2">
+      <div className="px-2 py-2 shrink-0">
         <Tooltip>
           <TooltipTrigger render={<div className="inline-flex" />}>
             <DropdownMenu>
@@ -222,7 +222,7 @@ function RoleSwitcher({
   }
 
   return (
-    <div className="px-3 py-2">
+    <div className="px-3 py-2 shrink-0">
       <DropdownMenu>
         <DropdownMenuTrigger render={
           <button
@@ -294,10 +294,10 @@ function SidebarContent({
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Branding */}
       <div 
-        className={`flex h-16 items-center gap-3 border-b border-sidebar-border px-4 ${onToggleCollapse ? 'cursor-pointer hover:bg-sidebar-accent/50 transition-colors' : ''}`}
+        className={`flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-4 ${onToggleCollapse ? 'cursor-pointer hover:bg-sidebar-accent/50 transition-colors' : ''}`}
         onClick={onToggleCollapse}
       >
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
@@ -333,8 +333,8 @@ function SidebarContent({
         collapsed={collapsed}
       />
 
-      {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
+      {/* Navigation — scrollable when there are many items */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none px-3 py-4">
         <nav className="space-y-6">
           {NAV_SECTIONS.map((section) => {
             const visibleItems = section.items.filter((item) =>
@@ -391,10 +391,10 @@ function SidebarContent({
             )
           })}
         </nav>
-      </ScrollArea>
+      </div>
 
       {/* User Card */}
-      <div className="border-t border-sidebar-border px-4 py-3">
+      <div className="border-t border-sidebar-border px-4 py-3 shrink-0">
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />

@@ -102,7 +102,7 @@ export default async function DashboardPage() {
   }
 
   const stats = await getDashboardStats(profile.branch_id ?? undefined)
-  const recentActivity = await getRecentActivity(8, profile.branch_id ?? undefined)
+  const recentActivity = await getRecentActivity(25, profile.branch_id ?? undefined)
 
   const canCreateEvents = hasPermission(permissions, 'create_events')
   const canApproveRegs = hasPermission(permissions, 'approve_registrations')
@@ -286,7 +286,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Recent Activity</CardTitle>
             <CardDescription>Latest changes across the portal</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-h-[360px] overflow-y-auto pr-4 space-y-3 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
             {recentActivity.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Clock className="h-8 w-8 text-muted-foreground/30" />
@@ -295,7 +295,7 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <>
                 {recentActivity.map((item) => (
                   <div
                     key={item.id}
@@ -326,7 +326,7 @@ export default async function DashboardPage() {
                     </span>
                   </div>
                 ))}
-              </div>
+              </>
             )}
           </CardContent>
         </Card>

@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/utils/supabase/server'
 
-// We use an admin or anon client for the public API, depending on RLS.
-// Since it's a public API, we can use the anon key.
+// We use the admin client because the Atrium portal relies on NextAuth and bypasses RLS.
+// We secure this route by explicitly filtering for public-safe statuses.
 export async function GET(request: Request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+    const supabase = createAdminClient()
 
     const { searchParams } = new URL(request.url)
     
@@ -22,8 +20,8 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('events')
-      .select('*, branches(name, slug)', { count: 'exact' })
-      .in('status', ['published', 'completed'])
+      .select('*, branches(name, slug), event_types(name)', { count: 'exact' })
+      .in('status', ['approved', 'published', 'completed'])
 
     if (status) {
       query = query.eq('status', status)

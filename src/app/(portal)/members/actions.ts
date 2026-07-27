@@ -4,13 +4,15 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { getUserProfileWithMembership } from '@/lib/queries'
+import { getActiveWorkspace } from '@/utils/auth/workspace'
 import { revalidatePath } from 'next/cache'
 
 export async function updateMembershipExpiry(profileId: string, expiryDate: string | null) {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Unauthorized')
 
-  const profile = await getUserProfileWithMembership(session.user.id)
+  const activeMembershipId = await getActiveWorkspace()
+  const profile = await getUserProfileWithMembership(session.user.id, activeMembershipId)
   if (!profile) throw new Error('Unauthorized')
 
   const supabase = createAdminClient()

@@ -232,7 +232,16 @@ function EditMembershipDialog({ profile }: { profile: FullUserProfile }) {
           <form action={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="ieeeMembershipId">IEEE Membership ID</Label>
-              <Input id="ieeeMembershipId" name="ieeeMembershipId" defaultValue={profile.ieee_membership_id ?? ''} />
+              <Input
+                id="ieeeMembershipId"
+                name="ieeeMembershipId"
+                defaultValue={profile.ieee_membership_id ?? ''}
+                pattern="\d{9}"
+                title="Must be exactly 9 digits"
+                onChange={(e) => {
+                  e.target.value = e.target.value.replace(/[^\d]/g, '').substring(0, 9);
+                }}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="currentPassword">Current Password (Required)</Label>

@@ -486,8 +486,14 @@ export async function resetUserPassword(formData: FormData) {
   const newPassword = String(formData.get('password') ?? '')
   if (!profileId || !newPassword) return { error: 'Profile ID and new password required' }
 
+  const bcrypt = (await import('bcrypt')).default
+  const newHash = await bcrypt.hash(newPassword, 12)
+
   const supabase = createAdminClient()
-  const { error } = await supabase.auth.admin.updateUserById(profileId, { password: newPassword })
+  const { error } = await supabase
+    .from('profiles')
+    .update({ password_hash: newHash })
+    .eq('id', profileId)
   if (error) return { error: error.message }
 
   await logAdminAction({

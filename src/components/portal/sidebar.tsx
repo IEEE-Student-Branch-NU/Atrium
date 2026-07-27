@@ -67,46 +67,7 @@ interface NavSection {
   items: NavItem[]
 }
 
-const NAV_SECTIONS: NavSection[] = [
-  {
-    title: 'Overview',
-    items: [
-      { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-    ],
-  },
-  {
-    title: 'Events',
-    items: [
-      { label: 'Events', href: '/events', icon: Calendar },
-      { label: 'Event Management', href: '/events/management', icon: LayoutDashboard, permission: 'manage_events' },
-      { label: 'Create Event', href: '/events/create', icon: CalendarPlus, permission: 'create_events' },
-      { label: 'Approve Events', href: '/events/approvals', icon: CheckSquare, permission: 'approve_events' },
-    ],
-  },
-  {
-    title: 'People',
-    items: [
-      { label: 'Registrations', href: '/approvals', icon: UserPlus, permission: 'approve_registrations' },
-      { label: 'Position Requests', href: '/position-requests', icon: Briefcase, permission: 'manage_positions' },
-      { label: 'Pre-Approved', href: '/pre-approved', icon: ShieldCheck, permission: 'approve_registrations' },
-      { label: 'Members', href: '/members', icon: Users },
-    ],
-  },
-  {
-    title: 'Account',
-    items: [
-      { label: 'About Me', href: '/profile', icon: User },
-      { label: 'My Positions', href: '/profile#positions', icon: Briefcase },
-    ],
-  },
-  {
-    title: 'System',
-    items: [
-      { label: 'Audit Log', href: '/audit', icon: ScrollText, permission: 'view_audit_log' },
-      { label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'manage_members' },
-    ],
-  },
-]
+
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -127,7 +88,14 @@ interface SidebarProps {
 
 function canSee(permissions: string[], required?: string): boolean {
   if (!required) return true
-  return permissions.includes('*') || permissions.includes(required)
+  if (permissions.includes('*')) return true
+  
+  if (required.includes(',')) {
+    const reqs = required.split(',').map(r => r.trim())
+    return reqs.some(r => permissions.includes(r))
+  }
+  
+  return permissions.includes(required)
 }
 
 function getInitials(name: string | null): string {
@@ -292,6 +260,47 @@ function SidebarContent({
   onToggleCollapse,
 }: SidebarProps & { collapsed: boolean; onToggleCollapse?: () => void }) {
   const pathname = usePathname()
+
+  const NAV_SECTIONS: NavSection[] = [
+    {
+      title: 'Overview',
+      items: [
+        { label: 'Dashboard', href: '/', icon: LayoutDashboard },
+      ],
+    },
+    {
+      title: 'Events',
+      items: [
+        { label: 'Events', href: '/events', icon: Calendar },
+        { label: 'Event Management', href: '/events/management', icon: LayoutDashboard, permission: 'manage_events' },
+        { label: 'Create Event', href: '/events/create', icon: CalendarPlus, permission: 'create_events' },
+        { label: 'Approve Events', href: '/events/approvals', icon: CheckSquare, permission: 'approve_events' },
+      ],
+    },
+    {
+      title: 'People',
+      items: [
+        { label: 'Registrations', href: '/approvals', icon: UserPlus, permission: 'approve_registrations' },
+        { label: 'Position Requests', href: '/position-requests', icon: Briefcase, permission: 'manage_positions' },
+        { label: 'Pre-Approved', href: '/pre-approved', icon: ShieldCheck, permission: 'approve_registrations' },
+        { label: 'Members', href: '/members', icon: Users },
+      ],
+    },
+    {
+      title: 'Account',
+      items: [
+        { label: 'About Me', href: '/profile', icon: User },
+        { label: 'My Positions', href: '/profile#positions', icon: Briefcase },
+      ],
+    },
+    {
+      title: 'System',
+      items: [
+        { label: 'Audit Log', href: '/audit', icon: ScrollText, permission: 'view_audit_log' },
+        { label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'manage_members, approve_registrations' },
+      ],
+    },
+  ]
 
   return (
     <div className="flex h-full flex-col overflow-hidden">

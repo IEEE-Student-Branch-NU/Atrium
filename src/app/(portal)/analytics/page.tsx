@@ -21,7 +21,7 @@ export default async function AnalyticsPage() {
   const permissions = await getUserPermissions(supabase, profile.id, profile.branch_id ?? '')
   
   // Guard
-  if (!hasPermission(permissions, 'approve_registrations')) {
+  if (!hasPermission(permissions, 'manage_members') && !hasPermission(permissions, 'approve_registrations')) {
     redirect('/')
   }
 

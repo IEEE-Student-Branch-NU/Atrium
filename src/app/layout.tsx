@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Analytics } from "@vercel/analytics/react";
 import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
+import Script from "next/script";
 
 import "./globals.css";
 
@@ -122,7 +123,8 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
         {/* JSON-LD Structured Data for search engines */}
-        <script
+        <Script
+          id="json-ld"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />

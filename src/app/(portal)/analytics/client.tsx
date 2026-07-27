@@ -168,9 +168,7 @@ export function AnalyticsClient({ branchStats, funnel, registrationTrends }: Ana
                   />
                   <Bar 
                     dataKey="members" 
-                    fill="currentColor" 
                     radius={[4, 4, 0, 0]} 
-                    className="fill-primary"
                   >
                     {branchStats.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

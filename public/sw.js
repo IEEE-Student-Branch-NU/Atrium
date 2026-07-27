@@ -4,7 +4,7 @@ const CACHE_NAME = "atrium-v1";
 const DATA_CACHE = "atrium-data-v1";
 
 /** Assets to pre-cache on install */
-const PRE_CACHE = ["/logo-v1.png", "/logo-v2.png", "/manifest.webmanifest"];
+const PRE_CACHE = ["/logo-v1.png", "/logo-v2.png", "/manifest.webmanifest", "/offline"];
 
 /**
  * Portal data paths that use stale-while-revalidate.
@@ -93,7 +93,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   // ── Network-first for everything else (HTML pages) ───────────────
-  if (request.headers.get("accept")?.includes("text/html")) {
+  if (request.headers.get("accept")?.includes("text/html") || request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -103,7 +103,12 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          
+          return caches.match("/offline");
+        })
     );
     return;
   }

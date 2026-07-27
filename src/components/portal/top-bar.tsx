@@ -45,7 +45,6 @@ export function TopBar({ user, title, unreadCount = 0 }: TopBarProps) {
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
       {/* Left: Page Title + Active Workspace Info */}
       <div className="flex items-center gap-4">
-        <div className="w-10 md:hidden" /> {/* spacer for mobile hamburger */}
         <div>
           <h1 className="text-lg font-semibold tracking-tight">
             {title ?? 'Dashboard'}
@@ -96,18 +95,18 @@ export function TopBar({ user, title, unreadCount = 0 }: TopBarProps) {
 
         {/* User Menu */}
         <DropdownMenu>
-          <DropdownMenuTrigger >
-            <Button variant="ghost" className="relative h-9 gap-2 rounded-full px-2">
-              <Avatar className="h-7 w-7">
-                <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />
-                <AvatarFallback className="text-xs font-medium">
-                  {getInitials(user.name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm font-medium md:inline-block">
-                {user.name?.split(' ')[0] ?? 'User'}
-              </span>
-            </Button>
+          <DropdownMenuTrigger render={
+            <Button variant="ghost" className="relative h-9 gap-2 rounded-full px-2" />
+          }>
+            <Avatar className="h-7 w-7">
+              <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />
+              <AvatarFallback className="text-xs font-medium">
+                {getInitials(user.name)}
+              </AvatarFallback>
+            </Avatar>
+            <span className="hidden text-sm font-medium md:inline-block">
+              {user.name?.split(' ')[0] ?? 'User'}
+            </span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>

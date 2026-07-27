@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { getUserProfileWithMembership, getPendingRegistrations, getApprovalHistory } from '@/lib/queries'
+import { getActiveWorkspace } from '@/utils/auth/workspace'
 import { ApprovalsClient } from './client'
 
 export const metadata = {
@@ -15,7 +16,8 @@ export default async function ApprovalsPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
 
-  const profile = await getUserProfileWithMembership(session.user.id)
+  const activeMembershipId = await getActiveWorkspace()
+  const profile = await getUserProfileWithMembership(session.user.id, activeMembershipId)
   if (!profile) redirect('/login')
 
   const supabase = createAdminClient()

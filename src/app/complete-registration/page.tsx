@@ -79,8 +79,10 @@ export default function CompleteRegistrationPage() {
                   placeholder="e.g. 102064653"
                   required
                   pattern="\d{9}"
-                  maxLength={9}
                   title="Must be exactly 9 digits"
+                  onChange={(e) => {
+                    e.target.value = e.target.value.replace(/[^\d]/g, '').substring(0, 9);
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   Found on your IEEE membership card (Member #)

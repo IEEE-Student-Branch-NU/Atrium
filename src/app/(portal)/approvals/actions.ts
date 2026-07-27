@@ -5,6 +5,7 @@ import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
 import { getUserPermissions, hasPermission } from '@/utils/auth/permissions'
 import { getUserProfileWithMembership } from '@/lib/queries'
+import { getActiveWorkspace } from '@/utils/auth/workspace'
 import { notifyUser } from '@/lib/notifications'
 import { logAdminAction } from '@/utils/auth/audit'
 
@@ -12,7 +13,8 @@ export async function approveRegistration(profileId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Unauthorized')
 
-  const profile = await getUserProfileWithMembership(session.user.id)
+  const activeMembershipId = await getActiveWorkspace()
+  const profile = await getUserProfileWithMembership(session.user.id, activeMembershipId)
   if (!profile) throw new Error('Unauthorized')
 
   const supabase = createAdminClient()
@@ -74,7 +76,8 @@ export async function markUnderReview(profileId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Unauthorized')
 
-  const profile = await getUserProfileWithMembership(session.user.id)
+  const activeMembershipId = await getActiveWorkspace()
+  const profile = await getUserProfileWithMembership(session.user.id, activeMembershipId)
   if (!profile) throw new Error('Unauthorized')
 
   const supabase = createAdminClient()
@@ -112,7 +115,8 @@ export async function rejectRegistration(profileId: string, reason: string) {
     throw new Error('Rejection reason is required')
   }
 
-  const profile = await getUserProfileWithMembership(session.user.id)
+  const activeMembershipId = await getActiveWorkspace()
+  const profile = await getUserProfileWithMembership(session.user.id, activeMembershipId)
   if (!profile) throw new Error('Unauthorized')
 
   const supabase = createAdminClient()

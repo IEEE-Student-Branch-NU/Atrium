@@ -1,5 +1,12 @@
+import type { Metadata } from 'next'
 import { Landmark } from 'lucide-react'
 import { LoginForm } from './login-form'
+
+export const metadata: Metadata = {
+  title: 'Login',
+  description:
+    'Sign in to Atrium – the IEEE Student Branch Nirma University portal. Access event management, membership tools, and chapter activities.',
+}
 
 export default function LoginPage() {
   return (

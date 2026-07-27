@@ -11,6 +11,15 @@ export function ServiceWorkerRegistrar() {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
     let registration: ServiceWorkerRegistration | null = null;
+    let refreshing = false;
+
+    // Reload the page when a new service worker takes over
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
 
     navigator.serviceWorker
       .register("/sw.js")

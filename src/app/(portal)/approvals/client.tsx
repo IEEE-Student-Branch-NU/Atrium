@@ -12,8 +12,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Check, X, Clock, Calendar, Mail, User, Phone, Hash } from 'lucide-react'
-import { approveRegistration, rejectRegistration } from './actions'
+import { Check, X, Clock, Calendar, Mail, User, Phone, Hash, AlertCircle, Eye } from 'lucide-react'
+import { approveRegistration, rejectRegistration, markUnderReview } from './actions'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -37,6 +37,18 @@ function PendingCard({ member }: { member: PendingMember }) {
     try {
       await approveRegistration(member.id)
       toast.success(`${member.full_name} has been approved!`)
+    } catch (error: any) {
+      toast.error(error.message)
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleUnderReview() {
+    setIsSubmitting(true)
+    try {
+      await markUnderReview(member.id)
+      toast.success(`${member.full_name} is now under review.`)
+      setIsSubmitting(false)
     } catch (error: any) {
       toast.error(error.message)
       setIsSubmitting(false)
@@ -70,9 +82,15 @@ function PendingCard({ member }: { member: PendingMember }) {
                 <Mail className="h-3.5 w-3.5" /> {member.email}
               </p>
             </div>
-            <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20">
-              Pending
-            </Badge>
+            {member.status === 'under_review' ? (
+              <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">
+                Under Review
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20">
+                Pending
+              </Badge>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -80,19 +98,26 @@ function PendingCard({ member }: { member: PendingMember }) {
               <span className="text-muted-foreground text-xs font-medium uppercase flex items-center gap-1">
                 <Hash className="h-3 w-3" /> IEEE ID
               </span>
-              <p className="font-mono">{member.ieee_membership_id}</p>
+              {member.ieee_membership_id ? (
+                <p className="font-mono">{member.ieee_membership_id}</p>
+              ) : (
+                <p className="text-amber-500 text-sm italic flex items-center gap-1.5 font-medium">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Not provided
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-xs font-medium uppercase flex items-center gap-1">
                 <User className="h-3 w-3" /> Section
               </span>
-              <p>{member.section || '—'}</p>
+              <p>{member.section || <span className="text-muted-foreground italic">—</span>}</p>
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-xs font-medium uppercase flex items-center gap-1">
                 <Phone className="h-3 w-3" /> Phone
               </span>
-              <p>{member.phone || '—'}</p>
+              <p>{member.phone || <span className="text-muted-foreground italic">Not provided</span>}</p>
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-xs font-medium uppercase flex items-center gap-1">
@@ -108,7 +133,7 @@ function PendingCard({ member }: { member: PendingMember }) {
         </div>
 
         {/* Actions Sidebar */}
-        <div className="bg-muted/30 md:w-48 p-5 flex flex-row md:flex-col gap-3 justify-center border-t md:border-t-0 md:border-l border-border/50">
+        <div className="md:w-48 p-5 flex flex-row md:flex-col gap-3 justify-center shrink-0">
           <Button
             className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white"
             onClick={handleApprove}
@@ -117,6 +142,17 @@ function PendingCard({ member }: { member: PendingMember }) {
             <Check className="mr-2 h-4 w-4" />
             Approve
           </Button>
+          {member.status === 'pending' && (
+            <Button
+              variant="outline"
+              className="flex-1 md:flex-none border-blue-200 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-400 dark:hover:bg-blue-950/30"
+              onClick={handleUnderReview}
+              disabled={isSubmitting}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Review
+            </Button>
+          )}
           <Button
             variant="outline"
             className="flex-1 md:flex-none text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
@@ -183,12 +219,20 @@ function HistoryCard({ item }: { item: ApprovalHistoryItem }) {
         )}
       </div>
       <div className="text-left sm:text-right text-sm text-muted-foreground space-y-1">
-        <p>By {item.approver_name || 'Admin'}</p>
-        <p>{new Date(item.approved_at || item.created_at).toLocaleDateString('en-IN', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        })}</p>
+        <p>
+          By <strong>{item.approver_name || 'Admin'}</strong>
+          {item.approved_by_position && <span className="opacity-80"> ({item.approved_by_position})</span>}
+        </p>
+        <p className="flex items-center gap-1.5 sm:justify-end">
+          <Clock className="h-3.5 w-3.5" />
+          {new Date(item.approved_at || item.created_at).toLocaleDateString('en-IN', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          })}
+        </p>
       </div>
     </div>
   )

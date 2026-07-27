@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 import { authMiddleware } from '@/utils/supabase/middleware'
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   return await authMiddleware(request)
 }
 

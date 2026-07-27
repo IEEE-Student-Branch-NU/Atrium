@@ -142,6 +142,7 @@ export default async function UsersPage({
                     <TableHead>Email</TableHead>
                     <TableHead>IEEE ID</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -162,6 +163,11 @@ export default async function UsersPage({
                       <TableCell>
                         <Badge variant={statusVariant(u.status)}>{u.status}</Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" render={<Link href={`/superadmin/users/${u.id}`} />} nativeButton={false}>
+                          Manage
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -181,7 +187,7 @@ export default async function UsersPage({
                     matches — so render a plain disabled Button at the
                     boundary instead of a disabled Link. */}
                 {page > 1 ? (
-                  <Button variant="outline" size="sm" render={<Link href={pageHref(page - 1)} />}>
+                  <Button variant="outline" size="sm" render={<Link href={pageHref(page - 1)} />} nativeButton={false}>
                     <ChevronLeft className="h-4 w-4" />
                     Previous
                   </Button>
@@ -192,7 +198,7 @@ export default async function UsersPage({
                   </Button>
                 )}
                 {page < totalPages ? (
-                  <Button variant="outline" size="sm" render={<Link href={pageHref(page + 1)} />}>
+                  <Button variant="outline" size="sm" render={<Link href={pageHref(page + 1)} />} nativeButton={false}>
                     Next
                     <ChevronRight className="h-4 w-4" />
                   </Button>

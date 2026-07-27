@@ -35,14 +35,17 @@ export async function getOrganizationTree(): Promise<OrgNode[]> {
   const { data: branches } = await supabase
     .from('branches').select('id, name, slug, description, parent_id').order('name')
   const { data: members } = await supabase
-    .from('memberships').select('branch_id').is('ended_at', null)
+    .from('memberships').select('branch_id, profile_id').is('ended_at', null)
 
-  const counts = new Map<string, number>()
-  for (const m of members ?? []) counts.set(m.branch_id, (counts.get(m.branch_id) ?? 0) + 1)
+  const branchUsers = new Map<string, Set<string>>()
+  for (const m of members ?? []) {
+    if (!branchUsers.has(m.branch_id)) branchUsers.set(m.branch_id, new Set())
+    branchUsers.get(m.branch_id)!.add(m.profile_id)
+  }
 
   const nodes = new Map<string, OrgNode>()
   for (const b of branches ?? []) {
-    nodes.set(b.id, { ...b, memberCount: counts.get(b.id) ?? 0, children: [] })
+    nodes.set(b.id, { ...b, memberCount: branchUsers.get(b.id)?.size ?? 0, children: [] })
   }
   const roots: OrgNode[] = []
   for (const node of nodes.values()) {
@@ -243,6 +246,142 @@ export async function getAllPermissions(): Promise<PermissionRow[]> {
   return data ?? []
 }
 
+// ── Notifications (oversight feed + send-dialog data) ────────
+// Reads the routing columns added in migration 00011. That migration may
+// not be applied yet, so every read degrades to empty rather than throwing
+// (mirrors getAuditLog).
+
+export type AdminNotificationRow = {
+  id: string
+  audience: string
+  type: string
+  event_key: string | null
+  title: string
+  message: string
+  is_read: boolean
+  created_at: string
+  recipient_name: string | null
+  branch_name: string | null
+  actor_name: string | null
+}
+
+export async function getAllNotifications(opts: {
+  audience?: string
+  type?: string
+  branchId?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<{ rows: AdminNotificationRow[]; total: number }> {
+  const supabase = createAdminClient()
+  const page = opts.page ?? 1
+  const pageSize = opts.pageSize ?? 50
+  const from = (page - 1) * pageSize
+
+  try {
+    let q = supabase
+      .from('notifications')
+      .select(
+        `id, audience, type, event_key, title, message, is_read, created_at,
+         recipient:profiles!notifications_profile_id_fkey(full_name),
+         actor:profiles!notifications_actor_profile_id_fkey(full_name),
+         branches(name)`,
+        { count: 'exact' },
+      )
+      .order('created_at', { ascending: false })
+
+    if (opts.audience) q = q.eq('audience', opts.audience)
+    if (opts.type) q = q.eq('type', opts.type)
+    if (opts.branchId) q = q.eq('branch_id', opts.branchId)
+    if (opts.search) {
+      const term = sanitizeSearchTerm(opts.search)
+      if (term) {
+        const s = `%${term}%`
+        q = q.or(`title.ilike.${s},message.ilike.${s}`)
+      }
+    }
+
+    const { data, count, error } = await q.range(from, from + pageSize - 1)
+    if (error) {
+      console.error('getAllNotifications failed', error)
+      return { rows: [], total: 0 }
+    }
+
+    const rows: AdminNotificationRow[] = (data ?? []).map((r) => {
+      const row = r as unknown as {
+        id: string; audience: string; type: string; event_key: string | null
+        title: string; message: string; is_read: boolean; created_at: string
+        recipient: { full_name: string | null } | null
+        actor: { full_name: string | null } | null
+        branches: { name: string } | null
+      }
+      return {
+        id: row.id,
+        audience: row.audience,
+        type: row.type,
+        event_key: row.event_key,
+        title: row.title,
+        message: row.message,
+        is_read: row.is_read,
+        created_at: row.created_at,
+        recipient_name: row.recipient?.full_name ?? null,
+        branch_name: row.branches?.name ?? null,
+        actor_name: row.actor?.full_name ?? null,
+      }
+    })
+    return { rows, total: count ?? 0 }
+  } catch (e) {
+    console.error('getAllNotifications failed', e)
+    return { rows: [], total: 0 }
+  }
+}
+
+/** Active workspaces (memberships) for a set of profiles — for the users-list quick open. */
+export type ProfileWorkspace = { membership_id: string; branch_name: string; position_name: string }
+
+export async function getActiveMembershipsForProfiles(
+  profileIds: string[],
+): Promise<Record<string, ProfileWorkspace[]>> {
+  if (profileIds.length === 0) return {}
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('memberships')
+    .select('id, profile_id, assigned_at, branches(name), positions(name)')
+    .in('profile_id', profileIds)
+    .is('ended_at', null)
+    .order('assigned_at', { ascending: true })
+
+  const map: Record<string, ProfileWorkspace[]> = {}
+  for (const m of data ?? []) {
+    const arr = map[m.profile_id] ?? []
+    arr.push({
+      membership_id: m.id,
+      branch_name: (m.branches as unknown as { name: string } | null)?.name ?? 'Unknown',
+      position_name: (m.positions as unknown as { name: string } | null)?.name ?? 'Member',
+    })
+    map[m.profile_id] = arr
+  }
+  return map
+}
+
+/** Branches for the send-dialog / feed filter. */
+export async function getBranchOptions(): Promise<{ id: string; name: string }[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase.from('branches').select('id, name').order('name')
+  return data ?? []
+}
+
+/** Basic user list for the targeted-send picker (capped). */
+export async function getRecipientOptions(limit = 500): Promise<{ id: string; full_name: string | null; email: string }[]> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .order('full_name')
+    .limit(limit)
+  return (data ?? []) as { id: string; full_name: string | null; email: string }[]
+}
+
 // ── Positions ────────────────────────────────────────────────
 
 export type PositionGroup = {
@@ -282,15 +421,24 @@ export async function listPositionsGrouped(): Promise<PositionGroup[]> {
 
 export type DecidedPositionRequest = {
   id: string
+  profile_id: string
   profile_name: string | null
   profile_email: string
   branch_name: string
   position_name: string
   status: string
+  reason: string
+  description: string | null
+  supporting_notes: string | null
   admin_comment: string | null
   decided_by_name: string | null
   decided_at: string | null
   created_at: string
+  profile_bio: string | null
+  profile_skills: string[] | null
+  profile_phone: string | null
+  profile_section: string | null
+  profile_ieee_membership_id: string | null
 }
 
 export async function getRecentDecidedPositionRequests(limit = 25): Promise<DecidedPositionRequest[]> {
@@ -298,8 +446,8 @@ export async function getRecentDecidedPositionRequests(limit = 25): Promise<Deci
   const { data } = await supabase
     .from('position_requests')
     .select(`
-      id, status, admin_comment, decided_at, created_at,
-      profiles!position_requests_profile_id_fkey(full_name, email),
+      id, profile_id, status, reason, description, supporting_notes, admin_comment, decided_at, created_at,
+      profiles!position_requests_profile_id_fkey(full_name, email, bio, skills, phone, section, ieee_membership_id),
       branches(name),
       positions(name),
       decided_by:profiles!position_requests_decided_by_fkey(full_name)
@@ -308,17 +456,28 @@ export async function getRecentDecidedPositionRequests(limit = 25): Promise<Deci
     .order('decided_at', { ascending: false })
     .limit(limit)
 
-  return (data ?? []).map((r) => ({
+  if (!data) return []
+
+  return data.map((r) => ({
     id: r.id,
-    profile_name: (r.profiles as unknown as { full_name: string | null } | null)?.full_name ?? null,
-    profile_email: (r.profiles as unknown as { email: string | null } | null)?.email ?? '',
-    branch_name: (r.branches as unknown as { name: string } | null)?.name ?? 'Unknown',
-    position_name: (r.positions as unknown as { name: string } | null)?.name ?? 'Unknown',
+    profile_id: r.profile_id,
+    profile_name: (r.profiles as any)?.full_name ?? null,
+    profile_email: (r.profiles as any)?.email ?? '',
+    branch_name: (r.branches as any)?.name ?? 'Unknown',
+    position_name: (r.positions as any)?.name ?? 'Unknown',
     status: r.status,
+    reason: r.reason,
+    description: r.description,
+    supporting_notes: r.supporting_notes,
     admin_comment: r.admin_comment,
-    decided_by_name: (r.decided_by as unknown as { full_name: string | null } | null)?.full_name ?? null,
+    decided_by_name: (r.decided_by as any)?.full_name ?? null,
     decided_at: r.decided_at,
     created_at: r.created_at,
+    profile_bio: (r.profiles as any)?.bio ?? null,
+    profile_skills: (r.profiles as any)?.skills ?? null,
+    profile_phone: (r.profiles as any)?.phone ?? null,
+    profile_section: (r.profiles as any)?.section ?? null,
+    profile_ieee_membership_id: (r.profiles as any)?.ieee_membership_id ?? null,
   }))
 }
 
@@ -383,4 +542,40 @@ export async function getAuditLog(opts: {
     console.error('getAuditLog failed', e)
     return { rows: [], total: 0 }
   }
+}
+
+// ── Notifications ──────────────────────────────────────────────
+
+export async function getLegacyAllNotifications(limit = 100) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('admin_notification_history')
+    .select('id, broadcast_id, title, message, type, created_at, recipient_count, read_count, single_profile_id, is_edited, target_filters')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('Error fetching all notifications:', error)
+    return []
+  }
+
+  // Enrich personal notifications with profile info
+  const profileIds = data.map(n => n.single_profile_id).filter(Boolean) as string[]
+  const profilesMap = new Map<string, { full_name: string, email: string }>()
+  
+  if (profileIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', profileIds)
+    
+    if (profiles) {
+      profiles.forEach(p => profilesMap.set(p.id, p))
+    }
+  }
+
+  return data.map(n => ({
+    ...n,
+    profiles: n.single_profile_id ? profilesMap.get(n.single_profile_id) : null
+  }))
 }

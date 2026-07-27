@@ -20,30 +20,43 @@ export interface RegistrationTrend {
 export async function getAnalyticsData() {
   const supabase = createAdminClient()
 
-  // 1. Branch distribution (Members per branch)
-  const { data: activeMemberships } = await supabase
-    .from('memberships')
-    .select('branch_id, branches(name)')
-    .is('ended_at', null)
+  // The membership and profile reads are independent — fetch concurrently.
+  // The membership and profile reads are independent — fetch concurrently.
+  const [membershipsRes, profilesRes] = await Promise.all([
+    supabase.from('memberships').select('branch_id, profile_id, branches(name)').is('ended_at', null),
+    supabase.from('profiles').select('id, status, created_at'),
+  ])
 
-  const branchCounts: Record<string, number> = {}
+  const profiles = profilesRes.data || []
+  
+  // Create a fast lookup for approved profile IDs
+  const approvedProfileIds = new Set(
+    profiles.filter(p => p.status === 'approved').map(p => p.id)
+  )
+
+  // 1. Branch distribution (Unique Approved Members per branch)
+  const activeMemberships = membershipsRes.data
+
+  const branchCounts: Record<string, Set<string>> = {}
   if (activeMemberships) {
     activeMemberships.forEach(m => {
-      const branchName = (m.branches as any)?.name ?? 'Unknown'
-      branchCounts[branchName] = (branchCounts[branchName] || 0) + 1
+      // Only count if the profile is currently approved
+      if (approvedProfileIds.has(m.profile_id)) {
+        const branchName = (m.branches as any)?.name ?? 'Unknown'
+        if (!branchCounts[branchName]) branchCounts[branchName] = new Set()
+        branchCounts[branchName].add(m.profile_id)
+      }
     })
   }
   
   const branchStats: BranchStats[] = Object.keys(branchCounts).map(name => ({
     name,
-    members: branchCounts[name]
+    members: branchCounts[name].size
   }))
 
   // 2. Funnel Stats
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('status, created_at')
-  
+
+
   const funnel: FunnelStats = {
     totalSignups: profiles?.length ?? 0,
     pending: profiles?.filter(p => p.status === 'pending').length ?? 0,

@@ -5,6 +5,8 @@ import { createAdminClient } from '@/utils/supabase/server'
 import { isSuperAdmin } from '@/utils/auth/superadmin'
 import authConfig from './auth.config'
 
+// The credential values were previously read from environment variables, but now they are purely database based in the `superadmins` table.
+
 /**
  * Main Auth.js v5 configuration (Node.js runtime).
  * We merge the edge-compatible `authConfig` with the Node.js-only
@@ -45,19 +47,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (isSuperAdminLogin) {
           // STRICT SUPERADMIN LOGIN: Only check superadmins table
-          const { data: superadmins } = await supabase.from('superadmins').select('hashed_email, passphrase_hash')
-          if (superadmins && superadmins.length > 0) {
-            let superadminRow = null
-            for (const row of superadmins) {
-              if (await bcrypt.compare(email, row.hashed_email)) {
-                superadminRow = row
-                break
-              }
-            }
+          const { data: superadminRow } = await supabase
+            .from('superadmins')
+            .select('email, passphrase_hash')
+            .eq('email', email)
+            .single()
 
-            if (superadminRow) {
-              isValid = await bcrypt.compare(password, superadminRow.passphrase_hash)
-            }
+          if (superadminRow) {
+            isValid = await bcrypt.compare(password, superadminRow.passphrase_hash)
           }
         } else {
           // STRICT NORMAL LOGIN: Only check profiles table

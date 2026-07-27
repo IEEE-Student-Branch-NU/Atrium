@@ -2,8 +2,10 @@
 
 import { redirect } from 'next/navigation'
 import { signIn as nextAuthSignIn, signOut as nextAuthSignOut, auth } from '@/auth'
+import { AuthError } from 'next-auth'
 import bcrypt from 'bcrypt'
 import { createAdminClient } from '@/utils/supabase/server'
+import { notifyUser } from '@/lib/notifications'
 
 /**
  * Sign in with Google OAuth.
@@ -31,39 +33,40 @@ export async function signInWithEmail(formData: FormData) {
       password,
       redirectTo: '/',
     })
-  } catch (error: any) {
-    // NextAuth throws a NEXT_REDIRECT on success — re-throw it
-    if (error?.digest?.startsWith('NEXT_REDIRECT')) {
-      throw error
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { error: 'Invalid email or password.' }
     }
-    return { error: 'Invalid email or password.' }
+    throw error
   }
 }
 
 /**
- * Sign in with email and password as Superadmin.
- * Passes the isSuperAdminLogin flag to Credentials provider.
+ * Sign in as Superadmin with a fixed username + password.
+ * The username is passed through NextAuth's Credentials provider in the
+ * `email` field (the provider's field name); `src/auth.ts` matches it against
+ * the hardcoded super-admin credentials — no email / Google account involved.
  */
 export async function signInAsSuperadmin(formData: FormData) {
-  const email = formData.get('email') as string
+  const username = formData.get('username') as string
   const password = formData.get('password') as string
 
-  if (!email || !password) {
-    return { error: 'Email and password are required.' }
+  if (!username || !password) {
+    return { error: 'Username and password are required.' }
   }
 
   try {
     await nextAuthSignIn('credentials', {
-      email,
+      email: username,
       password,
       isSuperAdminLogin: 'true',
       redirectTo: '/superadmin',
     })
-  } catch (error: any) {
-    if (error?.digest?.startsWith('NEXT_REDIRECT')) {
-      throw error
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { error: 'Invalid superadmin credentials.' }
     }
-    return { error: 'Invalid superadmin credentials.' }
+    throw error
   }
 }
 
@@ -83,7 +86,7 @@ export async function signUp(formData: FormData) {
   const roleName = (formData.get('role') as string) || 'Member'
 
   // ── Validation ──────────────────────────────────────────
-  if (!email || !password || !fullName || !ieeeMembershipId) {
+  if (!email || !password || !fullName || !ieeeMembershipId || !phone) {
     return { error: 'All required fields must be filled.' }
   }
 
@@ -99,12 +102,19 @@ export async function signUp(formData: FormData) {
     return { error: 'Passwords do not match.' }
   }
 
-  if (!/^\d{6,12}$/.test(ieeeMembershipId)) {
-    return { error: 'IEEE Membership ID must be 6-12 digits.' }
+  if (!/^\d{9}$/.test(ieeeMembershipId)) {
+    return { error: 'IEEE Membership ID must be exactly 9 digits.' }
   }
 
-  if (phone && !/^\+91\s\d{5}\s\d{5}$/.test(phone)) {
-    return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
+  // Handle 10 digits with or without space
+  let formattedPhone = phone
+  const rawDigits = phone.replace(/[^\d]/g, '')
+  if (rawDigits.length === 10) {
+    formattedPhone = `+91 ${rawDigits.substring(0, 5)} ${rawDigits.substring(5)}`
+  }
+
+  if (!/^\+91\s\d{5}\s\d{5}$/.test(formattedPhone)) {
+    return { error: 'Phone number must be a valid 10-digit Indian mobile number.' }
   }
 
   const supabase = createAdminClient()
@@ -149,7 +159,7 @@ export async function signUp(formData: FormData) {
     email,
     full_name: fullName,
     password_hash: passwordHash,
-    phone: phone || null,
+    phone: formattedPhone || null,
     ieee_membership_id: ieeeMembershipId,
     section,
     status: newStatus,
@@ -163,6 +173,9 @@ export async function signUp(formData: FormData) {
 
   // ── Create initial membership ───────────────────────────
   await assignMembership(supabase, profileData.id, branchSlug, roleName)
+
+  // ── Welcome the new member (in-app + email) ─────────────
+  await notifyUser({ profileId: profileData.id, event: 'welcome', params: { name: fullName } })
 
   // ── Auto sign-in after successful signup ────────────────
   try {
@@ -197,16 +210,23 @@ export async function completeRegistration(formData: FormData) {
   const branchSlug = (formData.get('branch') as string) || 'sbnu'
   const roleName = (formData.get('role') as string) || 'Member'
 
-  if (!ieeeMembershipId) {
-    return { error: 'IEEE Membership ID is required.' }
+  if (!ieeeMembershipId || !phone) {
+    return { error: 'All required fields must be filled.' }
   }
 
-  if (!/^\d{6,12}$/.test(ieeeMembershipId)) {
-    return { error: 'IEEE Membership ID must be 6-12 digits.' }
+  if (!/^\d{9}$/.test(ieeeMembershipId)) {
+    return { error: 'IEEE Membership ID must be exactly 9 digits.' }
   }
 
-  if (phone && !/^\+91\s?\d{5}\s?\d{5}$/.test(phone)) {
-    return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
+  // Handle 10 digits with or without space
+  let formattedPhone = phone
+  const rawDigits = phone.replace(/[^\d]/g, '')
+  if (rawDigits.length === 10) {
+    formattedPhone = `+91 ${rawDigits.substring(0, 5)} ${rawDigits.substring(5)}`
+  }
+
+  if (!/^\+91\s?\d{5}\s?\d{5}$/.test(formattedPhone)) {
+    return { error: 'Phone number must be a valid 10-digit Indian mobile number.' }
   }
 
   const supabase = createAdminClient()
@@ -223,7 +243,7 @@ export async function completeRegistration(formData: FormData) {
   const { error: profileError } = await supabase
     .from('profiles')
     .update({
-      phone: phone || null,
+      phone: formattedPhone || null,
       ieee_membership_id: ieeeMembershipId,
       section,
       status: newStatus,
@@ -240,6 +260,13 @@ export async function completeRegistration(formData: FormData) {
 
   // ── Create initial membership ───────────────────────────
   await assignMembership(supabase, session.user.id, branchSlug, roleName)
+
+  // ── Welcome the new member (in-app + email) ─────────────
+  await notifyUser({
+    profileId: session.user.id,
+    event: 'welcome',
+    params: { name: session.user.name ?? null },
+  })
 
   if (newStatus === 'approved') {
     redirect('/')
@@ -281,11 +308,21 @@ async function assignMembership(supabase: any, profileId: string, branchSlug: st
       }
     }
     
+    // Always grant the base 'Member' role
     await supabase.from('memberships').insert({
       profile_id: profileId,
       branch_id: branch.id,
-      position_id: positionId,
+      position_id: null,
     })
+
+    // If they requested a specific role, grant that additionally
+    if (positionId) {
+      await supabase.from('memberships').insert({
+        profile_id: profileId,
+        branch_id: branch.id,
+        position_id: positionId,
+      })
+    }
   } catch (err) {
     console.error('Failed to assign membership:', err)
   }

@@ -1,0 +1,75 @@
+# Real-Time Notifications using Supabase Realtime
+
+This PR transitions the notification system to a real-time WebSocket solution using Supabase Realtime, bridging NextAuth and Supabase via custom JWT minting.
+
+## User Review Required
+> [!WARNING]
+> Since this bridges NextAuth with Supabase Realtime, it requires setting the `SUPABASE_JWT_SECRET` in your `.env` files. This secret must match the one used by your Supabase project (found in Project Settings -> API).
+
+> [!IMPORTANT]
+> The PR description mentioned creating `00009_broadcast_notifications.sql`. However, a `00009_realtime_setup.sql` already exists. I will create `00010_broadcast_notifications.sql` instead to ensure migrations apply cleanly in order.
+
+## Open Questions
+1. Do you want the `sonner` toast to be clickable (e.g. redirecting to the notification's `link` if it exists)?
+2. Do you want me to add any specific styling to the toast (e.g. different colors based on notification `type`), or just a default toast?
+
+## Proposed Changes
+
+---
+
+### Database Changes
+Add a new migration `00010_broadcast_notifications.sql` to apply the required database changes.
+
+#### [NEW] [00010_broadcast_notifications.sql](file:///d:/IEEE/IEEE%20Website/Atrium/supabase/migrations/00010_broadcast_notifications.sql)
+- Make `notifications.profile_id` nullable.
+- Add a `CHECK` constraint: `(type = 'broadcast' AND profile_id IS NULL) OR (type != 'broadcast' AND profile_id IS NOT NULL)`.
+- Enable RLS on the `notifications` table.
+- Create a `SELECT` policy allowing a user to read rows where `profile_id = auth.uid() OR type = 'broadcast'`.
+- Add the `notifications` table to the `supabase_realtime` publication.
+
+#### [MODIFY] [SCHEMA.md](file:///d:/IEEE/IEEE%20Website/Atrium/docs/SCHEMA.md)
+- Update the documentation for the `notifications` table to reflect the nullable `profile_id`, the check constraint, and the RLS policy.
+
+---
+
+### Supabase & Auth Bridging
+
+#### [NEW] [token.ts](file:///d:/IEEE/IEEE%20Website/Atrium/src/utils/supabase/token.ts)
+- Create a utility function `mintSupabaseToken(profileId: string)` using the `jose` library.
+- It will create a JWT signed with `SUPABASE_JWT_SECRET` containing the claims `{ role: 'authenticated', sub: profileId }`.
+
+#### [MODIFY] [client.ts](file:///d:/IEEE/IEEE%20Website/Atrium/src/utils/supabase/client.ts)
+- Modify `createClient()` to accept an optional `accessToken?: string`.
+- If `accessToken` is provided, inject it into the `global.headers` config as `Authorization: Bearer <token>`, allowing the realtime socket to authenticate as the user.
+
+---
+
+### Client Provider
+
+#### [NEW] [realtime-notifications-provider.tsx](file:///d:/IEEE/IEEE%20Website/Atrium/src/components/providers/realtime-notifications-provider.tsx)
+- Create a Client Component provider.
+- It will take the `accessToken` as a prop.
+- On mount, it will instantiate a Supabase client using the `accessToken`.
+- It will subscribe to `INSERT` events on the `notifications` table. (Supabase Realtime will automatically filter events based on the RLS policy using the authenticated token).
+- On receiving an event, it will:
+  1. Trigger a `toast()` via `sonner`.
+  2. Call `router.refresh()` to update Server Components gracefully (e.g. unread counters in the top-bar).
+
+---
+
+### Layout Integration
+
+#### [MODIFY] [layout.tsx](file:///d:/IEEE/IEEE%20Website/Atrium/src/app/(portal)/layout.tsx)
+- Mint a JWT for the `actingProfileId` (obtained from `getEffectiveActor()`).
+- Wrap the main content with `<RealtimeNotificationsProvider accessToken={token}>`.
+
+## Verification Plan
+
+### Automated Tests
+- Run `npm run build` to ensure there are no TypeScript or build errors.
+
+### Manual Verification
+1. I will ask the user to add `SUPABASE_JWT_SECRET` to their `.env`.
+2. Push the migration to the database using `npx supabase db push` (or ask the user to run it).
+3. The user will log in, navigate to the portal, and use Supabase Studio (or a script) to insert a new row into the `notifications` table for their `profile_id`.
+4. We expect a toast notification to instantly appear in the browser without manually refreshing, and the top-bar notification counter to update.

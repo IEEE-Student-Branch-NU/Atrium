@@ -275,10 +275,10 @@ CREATE INDEX idx_event_audit_action ON event_audit_log (action);
 
 CREATE TABLE membership_audit_log (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  profile_id      UUID NOT NULL REFERENCES profiles(id),
-  branch_id       UUID NOT NULL REFERENCES branches(id),
+  profile_id      UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
   action          TEXT NOT NULL,
-  changed_by      UUID NOT NULL REFERENCES profiles(id),
+  changed_by      UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   details         JSONB,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );

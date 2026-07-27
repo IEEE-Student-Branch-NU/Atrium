@@ -22,7 +22,9 @@ import {
   Briefcase,
   ChevronsUpDown,
   Check,
+  Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +43,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -64,45 +67,7 @@ interface NavSection {
   items: NavItem[]
 }
 
-const NAV_SECTIONS: NavSection[] = [
-  {
-    title: 'Overview',
-    items: [
-      { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-    ],
-  },
-  {
-    title: 'Events',
-    items: [
-      { label: 'My Events', href: '/events', icon: Calendar },
-      { label: 'Create Event', href: '/events/create', icon: CalendarPlus, permission: 'create_events' },
-      { label: 'Approve Events', href: '/events/approvals', icon: CheckSquare, permission: 'approve_events' },
-    ],
-  },
-  {
-    title: 'People',
-    items: [
-      { label: 'Registrations', href: '/approvals', icon: UserPlus, permission: 'approve_registrations' },
-      { label: 'Position Requests', href: '/position-requests', icon: Briefcase, permission: 'manage_positions' },
-      { label: 'Pre-Approved', href: '/pre-approved', icon: ShieldCheck, permission: 'approve_registrations' },
-      { label: 'Members', href: '/members', icon: Users },
-    ],
-  },
-  {
-    title: 'Account',
-    items: [
-      { label: 'About Me', href: '/profile', icon: User },
-      { label: 'My Positions', href: '/profile#positions', icon: Briefcase },
-    ],
-  },
-  {
-    title: 'System',
-    items: [
-      { label: 'Audit Log', href: '/audit', icon: ScrollText, permission: 'view_audit_log' },
-      { label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'approve_registrations' },
-    ],
-  },
-]
+
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -123,7 +88,14 @@ interface SidebarProps {
 
 function canSee(permissions: string[], required?: string): boolean {
   if (!required) return true
-  return permissions.includes('*') || permissions.includes(required)
+  if (permissions.includes('*')) return true
+  
+  if (required.includes(',')) {
+    const reqs = required.split(',').map(r => r.trim())
+    return reqs.some(r => permissions.includes(r))
+  }
+  
+  return permissions.includes(required)
 }
 
 function getInitials(name: string | null): string {
@@ -149,16 +121,22 @@ function RoleSwitcher({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [switchingId, setSwitchingId] = useState<string | null>(null)
 
   const activeMembership = memberships.find((m) => m.id === activeMembershipId)
 
-  async function handleSwitch(membershipId: string) {
-    if (membershipId === activeMembershipId) return
+  function handleSwitch(m: UserMembership) {
+    if (m.id === activeMembershipId) return
+    setSwitchingId(m.id)
     startTransition(async () => {
-      const result = await switchWorkspace(membershipId)
+      const result = await switchWorkspace(m.id)
       if (result.success) {
-        router.refresh()
+        toast.success(`Switched to ${m.position_name ?? 'Member'} · ${m.branch_name}`)
+        router.push('/')
+      } else {
+        toast.error(result.error ?? 'Could not switch workspace')
       }
+      setSwitchingId(null)
     })
   }
 
@@ -166,9 +144,9 @@ function RoleSwitcher({
 
   if (collapsed) {
     return (
-      <div className="px-2 py-2">
+      <div className="px-2 py-2 shrink-0">
         <Tooltip>
-          <TooltipTrigger>
+          <TooltipTrigger render={<div className="inline-flex" />}>
             <DropdownMenu>
               <DropdownMenuTrigger render={
                 <Button
@@ -181,21 +159,25 @@ function RoleSwitcher({
                 <ChevronsUpDown className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent side="right" align="start" className="w-64">
-                <DropdownMenuLabel>Switch Workspace</DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Switch Workspace</DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 {memberships.map((m) => (
                   <DropdownMenuItem
                     key={m.id}
-                    onClick={() => handleSwitch(m.id)}
+                    onClick={() => handleSwitch(m)}
                     className="flex items-center justify-between"
                   >
                     <div>
                       <p className="text-sm font-medium">{m.position_name ?? 'Member'}</p>
                       <p className="text-xs text-muted-foreground">{m.branch_name}</p>
                     </div>
-                    {m.id === activeMembershipId && (
+                    {switchingId === m.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : m.id === activeMembershipId ? (
                       <Check className="h-4 w-4 text-emerald-500" />
-                    )}
+                    ) : null}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -208,43 +190,57 @@ function RoleSwitcher({
   }
 
   return (
-    <div className="px-3 py-2">
+    <div className="px-3 py-2 shrink-0">
       <DropdownMenu>
         <DropdownMenuTrigger render={
-          <Button
-            variant="outline"
-            className="w-full justify-between border-sidebar-border bg-sidebar-accent/30 text-sidebar-foreground hover:bg-sidebar-accent/50"
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-3 py-2 text-left cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50 hover:border-sidebar-primary/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isPending}
           />
         }>
-          <div className="flex min-w-0 flex-col items-start text-left">
-            <span className="text-xs font-semibold truncate w-full">
+          <div className="flex min-w-0 flex-col items-start">
+            <span
+              key={activeMembership?.id ?? 'none'}
+              className="text-xs font-semibold truncate w-full text-sidebar-foreground animate-in fade-in slide-in-from-left-1 duration-300"
+            >
               {activeMembership?.position_name ?? 'Member'}
             </span>
-            <span className="text-[10px] text-sidebar-foreground/50 truncate w-full">
+            <span
+              key={`branch-${activeMembership?.id ?? 'none'}`}
+              className="text-[10px] text-sidebar-foreground/50 truncate w-full animate-in fade-in slide-in-from-left-1 duration-500"
+            >
               {activeMembership?.branch_name ?? 'IEEE SBNU'}
             </span>
           </div>
-          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/40" />
+          {isPending ? (
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sidebar-foreground/40" />
+          ) : (
+            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/40 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[232px]">
-          <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-            Switch Workspace
-          </DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+              Switch Workspace
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           {memberships.map((m) => (
             <DropdownMenuItem
               key={m.id}
-              onClick={() => handleSwitch(m.id)}
+              onClick={() => handleSwitch(m)}
               className="flex items-center justify-between cursor-pointer"
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{m.position_name ?? 'Member'}</p>
                 <p className="text-xs text-muted-foreground truncate">{m.branch_name}</p>
               </div>
-              {m.id === activeMembershipId && (
+              {switchingId === m.id ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+              ) : m.id === activeMembershipId ? (
                 <Check className="h-4 w-4 shrink-0 text-emerald-500" />
-              )}
+              ) : null}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -265,11 +261,52 @@ function SidebarContent({
 }: SidebarProps & { collapsed: boolean; onToggleCollapse?: () => void }) {
   const pathname = usePathname()
 
+  const NAV_SECTIONS: NavSection[] = [
+    {
+      title: 'Overview',
+      items: [
+        { label: 'Dashboard', href: '/', icon: LayoutDashboard },
+      ],
+    },
+    {
+      title: 'Events',
+      items: [
+        { label: 'Events', href: '/events', icon: Calendar },
+        { label: 'Event Management', href: '/events/management', icon: LayoutDashboard, permission: 'manage_events' },
+        { label: 'Create Event', href: '/events/create', icon: CalendarPlus, permission: 'create_events' },
+        { label: 'Approve Events', href: '/events/approvals', icon: CheckSquare, permission: 'approve_events' },
+      ],
+    },
+    {
+      title: 'People',
+      items: [
+        { label: 'Registrations', href: '/approvals', icon: UserPlus, permission: 'approve_registrations' },
+        { label: 'Position Requests', href: '/position-requests', icon: Briefcase, permission: 'manage_positions' },
+        { label: 'Pre-Approved', href: '/pre-approved', icon: ShieldCheck, permission: 'approve_registrations' },
+        { label: 'Members', href: '/members', icon: Users },
+      ],
+    },
+    {
+      title: 'Account',
+      items: [
+        { label: 'About Me', href: '/profile', icon: User },
+        { label: 'My Positions', href: '/profile#positions', icon: Briefcase },
+      ],
+    },
+    {
+      title: 'System',
+      items: [
+        { label: 'Audit Log', href: '/audit', icon: ScrollText, permission: 'view_audit_log' },
+        { label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'manage_members, approve_registrations' },
+      ],
+    },
+  ]
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Branding */}
       <div 
-        className={`flex h-16 items-center gap-3 border-b border-sidebar-border px-4 ${onToggleCollapse ? 'cursor-pointer hover:bg-sidebar-accent/50 transition-colors' : ''}`}
+        className={`flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-4 ${onToggleCollapse ? 'cursor-pointer hover:bg-sidebar-accent/50 transition-colors' : ''}`}
         onClick={onToggleCollapse}
       >
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
@@ -305,8 +342,8 @@ function SidebarContent({
         collapsed={collapsed}
       />
 
-      {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
+      {/* Navigation — scrollable when there are many items */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none px-3 py-4">
         <nav className="space-y-6">
           {NAV_SECTIONS.map((section) => {
             const visibleItems = section.items.filter((item) =>
@@ -363,10 +400,10 @@ function SidebarContent({
             )
           })}
         </nav>
-      </ScrollArea>
+      </div>
 
       {/* User Card */}
-      <div className="border-t border-sidebar-border px-4 py-3">
+      <div className="border-t border-sidebar-border px-4 py-3 shrink-0">
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />

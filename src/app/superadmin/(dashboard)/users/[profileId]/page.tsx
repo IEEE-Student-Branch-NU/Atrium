@@ -18,10 +18,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getAllBranches, getPositionsForBranch, type PositionOption } from '@/lib/queries'
+import { getAllBranches, getPositionsGroupedByBranch } from '@/lib/queries'
 import { getUserAdminDetail, getAllPermissions } from '@/app/superadmin/queries'
 import { openWorkspace, removePosition, revokePermission } from '@/app/superadmin/actions'
 import { AssignPositionDialog, GrantPermissionDialog } from '../user-actions'
+import { ResetPasswordDialog } from '../reset-password-dialog'
+import { HardDeleteUserDialog } from '../hard-delete-user-dialog'
+import { RemoveSuperadminDialog } from '../remove-superadmin-dialog'
+
+function formatPermissionName(name: string) {
+  return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
 
 // `openWorkspace`, `removePosition`, and `revokePermission` return `{ error }`
 // on the unauthorized/not-found paths, which isn't assignable to a
@@ -62,20 +69,15 @@ export default async function UserDetailPage({
 }) {
   const { profileId } = await params
 
-  const [detail, branches, permissions] = await Promise.all([
+  // The assign-position dialog needs the full per-branch option set up front.
+  // Fetch it in ONE query grouped by branch (previously one query per branch).
+  const [detail, branches, permissions, positionsByBranch] = await Promise.all([
     getUserAdminDetail(profileId),
     getAllBranches(),
     getAllPermissions(),
+    getPositionsGroupedByBranch(),
   ])
   if (!detail) notFound()
-
-  // Positions are branch-scoped, so the assign-position dialog needs the
-  // full per-branch option set up front rather than fetching on each
-  // branch selection.
-  const positionsByBranchEntries = await Promise.all(
-    branches.map(async (b): Promise<[string, PositionOption[]]> => [b.id, await getPositionsForBranch(b.id)])
-  )
-  const positionsByBranch = Object.fromEntries(positionsByBranchEntries)
 
   const { profile, memberships, grants } = detail
   const activeMemberships = memberships.filter((m) => !m.ended_at)
@@ -194,12 +196,16 @@ export default async function UserDetailPage({
                               Open Workspace
                             </Button>
                           </form>
-                          <form action={removePositionAction}>
-                            <input type="hidden" name="membership_id" value={m.id} />
-                            <Button type="submit" variant="destructive" size="sm">
-                              Remove
-                            </Button>
-                          </form>
+                          {m.positions?.name?.toLowerCase().includes('superadmin') ? (
+                            <RemoveSuperadminDialog membershipId={m.id} positionName={m.positions.name} />
+                          ) : (
+                            <form action={removePositionAction}>
+                              <input type="hidden" name="membership_id" value={m.id} />
+                              <Button type="submit" variant="destructive" size="sm">
+                                Remove
+                              </Button>
+                            </form>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -278,7 +284,7 @@ export default async function UserDetailPage({
                   {grants.map((g) => (
                     <TableRow key={g.id}>
                       <TableCell className="font-medium">{g.branches?.name ?? '—'}</TableCell>
-                      <TableCell>{g.permissions?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell>{g.permissions?.name ? formatPermissionName(g.permissions.name) : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="text-muted-foreground">{formatDate(g.granted_at)}</TableCell>
                       <TableCell className="text-right">
                         <form action={revokePermissionAction}>
@@ -297,17 +303,15 @@ export default async function UserDetailPage({
         </CardContent>
       </Card>
 
-      {/* Account */}
-      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+      {/* Account (Danger Zone) */}
+      <Card className="border-destructive/50 bg-destructive/5">
         <CardHeader>
-          <CardTitle className="text-base">Account</CardTitle>
-          <CardDescription>Account-level actions for this user.</CardDescription>
+          <CardTitle className="text-base text-destructive">Danger Zone</CardTitle>
+          <CardDescription>Critical account-level actions for this user.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="outline" disabled>
-            <KeyRound className="h-4 w-4" />
-            Reset Password (coming soon)
-          </Button>
+        <CardContent className="flex flex-col sm:flex-row gap-4">
+          <ResetPasswordDialog profileId={profile.id} />
+          <HardDeleteUserDialog profileId={profile.id} />
         </CardContent>
       </Card>
     </div>

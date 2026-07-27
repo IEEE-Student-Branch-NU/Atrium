@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
 import { createAdminClient } from '@/utils/supabase/server'
+import { notifyBranch } from '@/lib/notifications'
 import bcrypt from 'bcrypt'
 
 /**
@@ -28,8 +29,16 @@ export async function updateProfile(formData: FormData) {
     return { error: 'Full name is required (at least 2 characters).' }
   }
 
-  if (phone && !/^\+91\s?\d{5}\s?\d{5}$/.test(phone)) {
-    return { error: 'Phone number must be a valid Indian mobile number (e.g. +91 98765 43210).' }
+  let formattedPhone = phone
+  if (phone) {
+    const rawDigits = phone.replace(/[^\d]/g, '')
+    if (rawDigits.length === 10) {
+      formattedPhone = `+91 ${rawDigits.substring(0, 5)} ${rawDigits.substring(5)}`
+    }
+    
+    if (!/^\+91\s\d{5}\s\d{5}$/.test(formattedPhone)) {
+      return { error: 'Phone number must be a valid 10-digit Indian mobile number.' }
+    }
   }
 
   const supabase = createAdminClient()
@@ -38,7 +47,7 @@ export async function updateProfile(formData: FormData) {
     .from('profiles')
     .update({
       full_name: fullName.trim(),
-      phone: phone || null,
+      phone: formattedPhone || null,
       bio: bio || null,
       skills: skills && skills.length > 0 ? skills : null,
     })
@@ -134,6 +143,59 @@ export async function changePassword(formData: FormData) {
 }
 
 /**
+ * Update the user's membership details (IEEE ID).
+ * Requires current password.
+ */
+export async function updateMembershipDetails(formData: FormData) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return { error: 'Not authenticated' }
+  }
+
+  const ieeeMembershipId = formData.get('ieeeMembershipId') as string
+  const currentPassword = formData.get('currentPassword') as string
+
+  if (!currentPassword) {
+    return { error: 'Current password is required to update membership details.' }
+  }
+
+  const supabase = createAdminClient()
+
+  // Get current password hash
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('password_hash')
+    .eq('id', session.user.id)
+    .single()
+
+  const hasPassword = !!profile?.password_hash
+
+  if (!hasPassword) {
+    return { error: 'Please set a password first using the Security section.' }
+  }
+
+  // Verify current password
+  const isValid = await bcrypt.compare(currentPassword, profile.password_hash)
+  if (!isValid) {
+    return { error: 'Current password is incorrect.' }
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ ieee_membership_id: ieeeMembershipId || null })
+    .eq('id', session.user.id)
+
+  if (error) {
+    console.error('Membership update error:', error)
+    return { error: 'Failed to update membership details. Please try again.' }
+  }
+
+  revalidatePath('/profile')
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+/**
  * Submit a request for a new position.
  */
 export async function requestPosition(formData: FormData) {
@@ -199,6 +261,23 @@ export async function requestPosition(formData: FormData) {
     console.error('Position request error:', error)
     return { error: 'Failed to submit request. Please try again.' }
   }
+
+  // Alert the branch's Chair(s) that a new request needs review.
+  const [{ data: requester }, { data: position }, { data: branch }] = await Promise.all([
+    supabase.from('profiles').select('full_name').eq('id', session.user.id).single(),
+    supabase.from('positions').select('name').eq('id', positionId).single(),
+    supabase.from('branches').select('name').eq('id', branchId).single(),
+  ])
+  await notifyBranch({
+    branchId,
+    event: 'position_request.submitted',
+    params: {
+      name: requester?.full_name ?? null,
+      position: position?.name ?? null,
+      branch: branch?.name ?? null,
+    },
+    actorProfileId: session.user.id,
+  })
 
   revalidatePath('/profile')
   return { success: true }

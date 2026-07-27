@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { auth } from '@/auth'
 import { signOut } from '@/app/auth/actions'
 import { createAdminClient } from '@/utils/supabase/server'
@@ -110,11 +111,18 @@ export default async function RejectedPage() {
               </p>
             </div>
 
-            <form action={signOut}>
-              <Button variant="outline" type="submit" className="w-full">
-                Sign Out
-              </Button>
-            </form>
+            <div className="flex flex-col gap-2">
+              <Link href="/complete-registration" className="w-full">
+                <Button className="w-full">
+                  Update Details & Reapply
+                </Button>
+              </Link>
+              <form action={signOut}>
+                <Button variant="outline" type="submit" className="w-full">
+                  Sign Out
+                </Button>
+              </form>
+            </div>
           </CardContent>
         </Card>
       </div>

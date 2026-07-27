@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { TableCell, TableRow } from '@/components/ui/table'
 import { createPosition, updatePosition, deletePosition, setPositionPermissions } from '@/app/superadmin/actions'
 import type { BranchOption } from '@/lib/queries'
 import type { PermissionRow } from '@/app/superadmin/queries'
@@ -215,6 +216,10 @@ function DeletePositionButton({ position }: { position: PositionSummary }) {
 
 // ── Permissions Editor ───────────────────────────────────────
 
+function formatPermissionName(name: string) {
+  return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
+
 function PermissionsDialog({
   position,
   allPermissions,
@@ -275,7 +280,7 @@ function PermissionsDialog({
                     className="mt-0.5"
                   />
                   <span className="flex flex-col">
-                    <span className="text-sm">{perm.name}</span>
+                    <span className="text-sm">{formatPermissionName(perm.name)}</span>
                     {perm.description && (
                       <span className="text-xs text-muted-foreground">{perm.description}</span>
                     )}
@@ -299,9 +304,9 @@ function PermissionsDialog({
   )
 }
 
-// ── Position Card ────────────────────────────────────────────
+// ── Position Row ──────────────────────────────────────────────
 
-export function PositionCard({
+export function PositionRow({
   position,
   allPermissions,
 }: {
@@ -311,26 +316,30 @@ export function PositionCard({
   const grantedPermissions = allPermissions.filter((p) => position.permissionIds.includes(p.id))
 
   return (
-    <div className="flex flex-col gap-2 px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-medium">{position.name}</span>
-        <div className="flex items-center gap-1">
+    <TableRow>
+      <TableCell className="font-medium align-top py-4">
+        {position.name}
+      </TableCell>
+      <TableCell className="align-top py-4">
+        <div className="flex flex-wrap gap-1.5">
+          {grantedPermissions.length === 0 ? (
+            <span className="text-xs text-muted-foreground">No permissions granted.</span>
+          ) : (
+            grantedPermissions.map((p) => (
+              <Badge key={p.id} variant="secondary" className="font-normal border-transparent bg-muted">
+                {formatPermissionName(p.name)}
+              </Badge>
+            ))
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="align-top text-right py-4">
+        <div className="flex items-center justify-end gap-1">
           <PermissionsDialog position={position} allPermissions={allPermissions} />
           <RenamePositionDialog position={position} />
           <DeletePositionButton position={position} />
         </div>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {grantedPermissions.length === 0 ? (
-          <span className="text-xs text-muted-foreground">No permissions granted.</span>
-        ) : (
-          grantedPermissions.map((p) => (
-            <Badge key={p.id} variant="secondary">
-              {p.name}
-            </Badge>
-          ))
-        )}
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   )
 }

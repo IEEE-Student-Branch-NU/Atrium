@@ -1,20 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { useTheme } from 'next-themes'
-import { Moon, Sun, Bell, User } from 'lucide-react'
+import { Moon, Sun, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { signOut } from '@/app/auth/actions'
+import Link from 'next/link'
 
 interface TopBarProps {
   user: {
@@ -93,51 +84,18 @@ export function TopBar({ user, title, unreadCount = 0 }: TopBarProps) {
           <span className="sr-only">Toggle theme</span>
         </Button>
 
-        {/* User Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger render={
-            <Button variant="ghost" className="relative h-9 gap-2 rounded-full px-2" />
-          }>
-            <Avatar className="h-7 w-7">
-              <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />
-              <AvatarFallback className="text-xs font-medium">
-                {getInitials(user.name)}
-              </AvatarFallback>
-            </Avatar>
-            <span className="hidden text-sm font-medium md:inline-block">
-              {user.name?.split(' ')[0] ?? 'User'}
-            </span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user.name ?? 'User'}</p>
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {user.position && (
-              <>
-                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                  {user.position} · {user.branch}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            <DropdownMenuItem render={<Link href="/profile" className="flex items-center gap-2 cursor-pointer" />}>
-              <User className="h-3.5 w-3.5" />
-              About Me
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem >
-              <form action={signOut} className="w-full">
-                <button type="submit" className="w-full text-left">
-                  Sign out
-                </button>
-              </form>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* User Pill (non-clickable) */}
+        <div className="flex h-9 items-center gap-2 rounded-full px-2">
+          <Avatar className="h-7 w-7">
+            <AvatarImage src={user.avatar_url ?? undefined} alt={user.name ?? ''} />
+            <AvatarFallback className="text-xs font-medium">
+              {getInitials(user.name)}
+            </AvatarFallback>
+          </Avatar>
+          <span className="hidden text-sm font-medium md:inline-block">
+            {user.name?.split(' ')[0] ?? 'User'}
+          </span>
+        </div>
       </div>
     </header>
   )

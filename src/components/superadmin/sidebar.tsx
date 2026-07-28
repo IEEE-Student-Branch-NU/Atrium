@@ -18,6 +18,9 @@ import {
   Menu,
   LogOut,
   Shield,
+  UserPlus,
+  UserCheck,
+  PieChart,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -49,6 +52,9 @@ const NAV: NavItem[] = [
   { label: 'Dashboard', href: '/superadmin', icon: LayoutDashboard },
   { label: 'Organizations', href: '/superadmin/organizations', icon: Building2 },
   { label: 'Users', href: '/superadmin/users', icon: Users },
+  { label: 'Analytics', href: '/superadmin/analytics', icon: PieChart },
+  { label: 'Approvals', href: '/superadmin/approvals', icon: UserPlus },
+  { label: 'Pre-Approved', href: '/superadmin/pre-approved', icon: UserCheck },
   { label: 'Positions', href: '/superadmin/positions', icon: BadgeCheck },
   { label: 'Position Requests', href: '/superadmin/position-requests', icon: Inbox },
   { label: 'Notifications', href: '/superadmin/notifications', icon: Bell },

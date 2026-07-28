@@ -68,6 +68,7 @@ export async function approveRegistration(profileId: string) {
   }
 
   revalidatePath('/approvals')
+  revalidatePath('/superadmin/approvals')
   revalidatePath('/')
   return { success: true }
 }
@@ -103,6 +104,7 @@ export async function markUnderReview(profileId: string) {
   if (error) throw new Error(error.message)
 
   revalidatePath('/approvals')
+  revalidatePath('/superadmin/approvals')
   revalidatePath('/')
   return { success: true }
 }
@@ -160,6 +162,7 @@ export async function rejectRegistration(profileId: string, reason: string) {
   }
 
   revalidatePath('/approvals')
+  revalidatePath('/superadmin/approvals')
   revalidatePath('/')
   return { success: true }
 }

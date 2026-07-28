@@ -43,6 +43,7 @@ export async function addPreApprovedMember(ieeeId: string, name: string, email?:
   }
 
   revalidatePath('/pre-approved')
+  revalidatePath('/superadmin/pre-approved')
   return { success: true }
 }
 
@@ -71,5 +72,6 @@ export async function removePreApprovedMember(id: string) {
   }
 
   revalidatePath('/pre-approved')
+  revalidatePath('/superadmin/pre-approved')
   return { success: true }
 }

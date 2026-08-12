@@ -33,8 +33,16 @@ export const isSuperAdmin = cache(async (email: string | null | undefined): Prom
   return matchesSuperAdmin(email, data)
 })
 
-/** IO wrapper: reads session + impersonation cookie, validates the target membership is active. */
-export async function getEffectiveActor(): Promise<EffectiveActor> {
+/**
+ * IO wrapper: reads session + impersonation cookie, validates the target
+ * membership is active.
+ *
+ * Memoized per request with React `cache()`. This is called from the Edge/portal
+ * layout AND again from nearly every page/action within the same render, each
+ * time re-running `auth()` and (for super admins) a `memberships` round-trip.
+ * `cache()` collapses those duplicates to a single resolution per request.
+ */
+export const getEffectiveActor = cache(async (): Promise<EffectiveActor> => {
   const session = await auth()
   const realProfileId = session?.user?.id ?? null
   const realEmail = session?.user?.email ?? null
@@ -56,7 +64,7 @@ export async function getEffectiveActor(): Promise<EffectiveActor> {
   }
 
   return resolveEffectiveActor({ realProfileId, realEmail, isSuperAdmin: isSA, impersonatedMembership })
-}
+})
 
 /**
  * Verifies if the provided password matches the superadmin password for the given email.

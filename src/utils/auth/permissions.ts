@@ -1,5 +1,7 @@
+import { cache } from 'react'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { auth } from '@/auth'
+import { createAdminClient } from '@/utils/supabase/server'
 
 export type PermissionName =
   | 'create_events'
@@ -30,6 +32,25 @@ export async function getUserPermissions(
   branchId: string,
   membershipId?: string | null
 ): Promise<string[]> {
+  // Delegate to the request-memoized core. The passed `supabase` is always an
+  // RLS-bypassing admin client, so the result is identical regardless of which
+  // instance is used — the core creates its own so it can be keyed purely on the
+  // primitive args. This dedupes the layout's permission read against the page's
+  // (both resolve the same workspace) within a single request.
+  return getUserPermissionsCached(profileId, branchId, membershipId ?? null)
+}
+
+/**
+ * Request-memoized permission resolution keyed on (profileId, branchId,
+ * membershipId). See getUserPermissions for the delegation rationale.
+ */
+const getUserPermissionsCached = cache(async (
+  profileId: string,
+  branchId: string,
+  membershipId: string | null
+): Promise<string[]> => {
+  const supabase = createAdminClient()
+
   // 1. Check SuperAdmin bypass from session
   const session = await auth()
   if (session?.isSuperAdmin) {
@@ -119,7 +140,7 @@ export async function getUserPermissions(
 
   // 4. Deduplicate
   return [...new Set(permissionNames)]
-}
+})
 
 /**
  * Checks if a permission set includes the required permission.

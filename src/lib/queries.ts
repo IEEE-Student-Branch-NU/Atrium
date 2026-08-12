@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createAdminClient } from '@/utils/supabase/server'
 
 // ── Dashboard Stats ──────────────────────────────────────────
@@ -112,10 +113,10 @@ export interface UserProfileWithMembership {
  * If activeMembershipId is provided, uses that specific membership.
  * Otherwise falls back to the first active membership.
  */
-export async function getUserProfileWithMembership(
+export const getUserProfileWithMembership = cache(async (
   profileId: string,
   activeMembershipId?: string | null
-): Promise<UserProfileWithMembership | null> {
+): Promise<UserProfileWithMembership | null> => {
   const supabase = createAdminClient()
   const MEMBERSHIP_COLS = 'id, branch_id, position_id, branches(name, slug), positions(name)'
 
@@ -168,7 +169,7 @@ export async function getUserProfileWithMembership(
     position_id: membership?.position_id ?? null,
     membership_id: membership?.id ?? null,
   }
-}
+})
 
 // ── All User Memberships (for Role Switcher) ─────────────────
 
@@ -182,7 +183,7 @@ export interface UserMembership {
   assigned_at: string
 }
 
-export async function getAllUserMemberships(profileId: string): Promise<UserMembership[]> {
+export const getAllUserMemberships = cache(async (profileId: string): Promise<UserMembership[]> => {
   const supabase = createAdminClient()
 
   const { data } = await supabase
@@ -203,7 +204,7 @@ export async function getAllUserMemberships(profileId: string): Promise<UserMemb
     position_name: (m.positions as any)?.name ?? 'Member',
     assigned_at: m.assigned_at,
   }))
-}
+})
 
 // ── Full User Profile (for About Me page) ────────────────────
 

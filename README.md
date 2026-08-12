@@ -362,6 +362,20 @@ When you clone the repository, open it in your AI coding assistant of choice and
 ```
 (Or run `graphify extract .` via CLI). The agent will automatically use the generated graph for all codebase-related questions.
 
+### 🛠️ Quality Squad (Claude Code subagents)
+
+The repo ships a squad of checked-in Claude Code agents (`.claude/agents/`) that continuously
+maintain the portal's standards through an orchestrated **design → build → test → review → perf**
+flow. A `product-manager` orchestrates; `system-design-engineer`, `db-engineer`, `backend-engineer`,
+`code-tester`, `performance-auditor`, and `code-reviewer` are the specialists. They encode Atrium's
+real invariants (service-role/RLS-bypass safety, request-level `cache()`, append-only history,
+edge-safety, manual migrations, the build+test gate, the ~100 ms response budget).
+
+| Doc | What it covers |
+|-----|----------------|
+| **[.claude/agents/README.md](.claude/agents/README.md)** | Roster, interaction model, flow diagram, how to invoke |
+| **[.claude/agents/agent-docs.md](.claude/agents/agent-docs.md)** | Design rationale, orchestration, tool/model choices, trade-offs & thought process |
+
 ---
 
 ## 👥 Team

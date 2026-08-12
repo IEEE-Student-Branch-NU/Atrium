@@ -8,6 +8,10 @@ append-only history, edge-safety, manual migrations, the `npm run build && npm t
 `sanitizeSearchTerm`), not generic advice — see [`CLAUDE.md`](../../CLAUDE.md) and
 [`docs/ENGINEERING.md`](../../docs/ENGINEERING.md).
 
+> **Design rationale & thought process:** see [`agent-docs.md`](agent-docs.md) for *why* the squad
+> is shaped this way — role boundaries, tool-scoping, model choices, the orchestration model, and
+> the trade-offs considered.
+
 ## The squad
 
 | Agent | Role | Edits code? | Spawns others? | Model |

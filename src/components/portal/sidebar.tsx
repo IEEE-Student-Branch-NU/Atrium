@@ -453,18 +453,89 @@ function SidebarContent({
   )
 }
 
-// ── Desktop Sidebar ──────────────────────────────────────────
+// ── Mobile Bottom Navigation ─────────────────────────────────
+
+function MobileNav({
+  user,
+  permissions,
+  memberships,
+  activeMembershipId,
+}: SidebarProps) {
+  const pathname = usePathname()
+
+  const tabs = [
+    { label: 'Home', href: '/', icon: LayoutDashboard },
+    { label: 'Events', href: '/events', icon: Calendar },
+    { label: 'Members', href: '/members', icon: Users },
+    { label: 'Profile', href: '/profile', icon: User },
+  ]
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-sidebar-border bg-background/80 backdrop-blur-md md:hidden px-2 pb-safe">
+      {tabs.map((tab) => {
+        const isActive = tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href)
+        const Icon = tab.icon
+
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            className={`flex flex-col items-center justify-center w-full h-full gap-1 ${
+              isActive ? 'text-sidebar-primary' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Icon className="h-5 w-5" />
+            <span className="text-[10px] font-medium">{tab.label}</span>
+          </Link>
+        )
+      })}
+      
+      {/* More (Sheet Trigger) */}
+      <Sheet>
+        <SheetTrigger render={
+          <Button
+            variant="ghost"
+            className="flex flex-col items-center justify-center w-full h-full gap-1 rounded-none px-0 py-0 hover:bg-transparent text-muted-foreground hover:text-foreground"
+          >
+            <Menu className="h-5 w-5" />
+            <span className="text-[10px] font-medium">More</span>
+          </Button>
+        } />
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-xl bg-sidebar p-0 [&>button]:hidden">
+          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          <SidebarContent
+            user={user}
+            permissions={permissions}
+            memberships={memberships}
+            activeMembershipId={activeMembershipId}
+            collapsed={false}
+          />
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
+// ── Responsive Layout Wrapper ────────────────────────────────
 
 export function Sidebar({ user, permissions, memberships, activeMembershipId }: SidebarProps) {
+  // Use Tailwind classes to manage the default collapsed state across breakpoints.
+  // md (tablet portrait) -> collapsed by default?
+  // We can just keep a simple state for now, but we want the user to be able to toggle.
   const [collapsed, setCollapsed] = useState(false)
 
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* Tablet / Desktop Sidebar */}
+      {/* Hidden on mobile, w-[68px] on md (tablet portrait), w-64 on lg (landscape/desktop) */}
+      {/* If the user manually collapses, it goes to w-[68px]. We'll use a responsive class structure if possible, but state is simpler. */}
+      {/* Let's default to full width, but allow collapsing. We'll rely on CSS media queries where possible for layout. */}
       <aside
         className={`hidden md:flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ${
-          collapsed ? 'w-[68px]' : 'w-64'
+          collapsed ? 'w-[68px]' : 'w-[68px] lg:w-64'
         }`}
+        onMouseEnter={() => collapsed && setCollapsed(false)}
+        onMouseLeave={() => !collapsed && setCollapsed(true)}
       >
         <SidebarContent
           user={user}
@@ -476,28 +547,13 @@ export function Sidebar({ user, permissions, memberships, activeMembershipId }: 
         />
       </aside>
 
-      {/* Mobile Sidebar (Sheet) */}
-      <Sheet>
-        <SheetTrigger render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className="fixed left-4 top-4 z-40 md:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        } />
-        <SheetContent side="left" className="w-64 bg-sidebar p-0 [&>button]:hidden">
-          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-          <SidebarContent
-            user={user}
-            permissions={permissions}
-            memberships={memberships}
-            activeMembershipId={activeMembershipId}
-            collapsed={false}
-          />
-        </SheetContent>
-      </Sheet>
+      {/* Mobile Bottom Navigation */}
+      <MobileNav
+        user={user}
+        permissions={permissions}
+        memberships={memberships}
+        activeMembershipId={activeMembershipId}
+      />
     </>
   )
 }

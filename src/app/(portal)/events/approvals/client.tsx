@@ -17,7 +17,18 @@ interface PendingEvent {
   status: string
   branches: { name: string } | null
   profiles: { full_name: string | null; email: string } | null
-  creator_id: string
+  // Null once the creator has been hard-deleted; `creator_snapshot` then carries
+  // who they were (frozen by hard_delete_profile(), migration 00019).
+  creator_id: string | null
+  creator_snapshot: { id: string; full_name: string | null; email: string | null } | null
+}
+
+/** Creator label that survives a hard-deleted author. */
+function creatorLabel(event: PendingEvent): string {
+  if (event.profiles) return event.profiles.full_name || event.profiles.email
+  const snap = event.creator_snapshot
+  if (snap) return `${snap.full_name || snap.email || 'Unknown'} (deleted)`
+  return 'Deleted user'
 }
 
 export function ApprovalsClient({ 
@@ -117,7 +128,7 @@ function EventApprovalCard({
           </Link>
           <div className="text-sm text-muted-foreground mt-1 space-y-1">
             <p>Branch: <span className="font-medium text-foreground">{event.branches?.name}</span></p>
-            <p>Created by: <span className="font-medium text-foreground">{event.profiles?.full_name || event.profiles?.email}</span></p>
+            <p>Created by: <span className="font-medium text-foreground">{creatorLabel(event)}</span></p>
             <p>Date: {new Date(event.event_date).toLocaleDateString()}</p>
           </div>
         </div>

@@ -41,6 +41,16 @@ export default async function PortalLayout({
     redirect('/login')
   }
 
+  // Defense in depth behind the middleware gate (gateRedirectPath in
+  // @/utils/supabase/middleware): only `approved` members may render the portal.
+  // Same fail-closed shape — anything that isn't `approved` is bounced, so a new
+  // `registration_status` value can never leak in through this layer either.
+  // Skipped while impersonating: a super admin viewing a member's workspace is
+  // deliberately looking at a not-yet-approved member and must not be bounced.
+  if (!actor.isImpersonating && profile.status !== 'approved') {
+    redirect(profile.status === 'rejected' ? '/rejected' : '/pending')
+  }
+
   // Fetch permissions for the active workspace (needs the resolved profile).
   const supabase = createAdminClient()
   let permissions: string[] = []

@@ -252,13 +252,17 @@ export async function approveEvent(id: string, comment?: string) {
     })
   }
 
-  // Notify creator
-  await supabase.from('notifications').insert({
-    profile_id: event.creator_id,
-    title: 'Event Approved',
-    message: `Your event "${event.name}" has been approved and published.`,
-    type: 'success'
-  })
+  // Notify creator. `creator_id` is null when the creator was hard-deleted
+  // (migration 00019) — notifications.profile_id is NOT NULL, so skip rather
+  // than fail the whole approval on an orphaned event.
+  if (event.creator_id) {
+    await supabase.from('notifications').insert({
+      profile_id: event.creator_id,
+      title: 'Event Approved',
+      message: `Your event "${event.name}" has been approved and published.`,
+      type: 'success'
+    })
+  }
 
   revalidatePath('/events')
   revalidatePath(`/events/${id}`)
@@ -307,13 +311,15 @@ export async function rejectEvent(id: string, comment?: string) {
     })
   }
 
-  // Notify creator with notes
-  await supabase.from('notifications').insert({
-    profile_id: event.creator_id,
-    title: 'Event Sent Back for Revision',
-    message: `Your event "${event.name}" needs changes before it can be approved.${comment ? ` Notes: ${comment}` : ''}`,
-    type: 'warning'
-  })
+  // Notify creator with notes (skipped for a hard-deleted creator — see approveEvent)
+  if (event.creator_id) {
+    await supabase.from('notifications').insert({
+      profile_id: event.creator_id,
+      title: 'Event Sent Back for Revision',
+      message: `Your event "${event.name}" needs changes before it can be approved.${comment ? ` Notes: ${comment}` : ''}`,
+      type: 'warning'
+    })
+  }
 
   revalidatePath('/events')
   revalidatePath(`/events/${id}`)
@@ -344,13 +350,15 @@ export async function publishEvent(id: string) {
     })
   }
 
-  // Notify creator
-  await supabase.from('notifications').insert({
-    profile_id: event.creator_id,
-    title: 'Event Published',
-    message: `Your event "${event.name}" is now live and visible to everyone!`,
-    type: 'success'
-  })
+  // Notify creator (skipped for a hard-deleted creator — see approveEvent)
+  if (event.creator_id) {
+    await supabase.from('notifications').insert({
+      profile_id: event.creator_id,
+      title: 'Event Published',
+      message: `Your event "${event.name}" is now live and visible to everyone!`,
+      type: 'success'
+    })
+  }
 
   revalidatePath('/events')
   revalidatePath(`/events/${id}`)

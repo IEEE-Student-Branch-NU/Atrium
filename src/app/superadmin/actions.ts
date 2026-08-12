@@ -507,6 +507,15 @@ export async function resetUserPassword(formData: FormData) {
   return { success: true }
 }
 
+/** Identity snapshot returned by the `hard_delete_profile` RPC (password hash stripped). */
+type DeletedProfileSnapshot = {
+  id: string
+  full_name: string | null
+  email: string | null
+  ieee_membership_id: string | null
+  status: string | null
+}
+
 export async function hardDeleteUser(formData: FormData) {
   const session = await requireSuperAdmin()
   if (!session) return { error: 'Not authorized' }
@@ -514,30 +523,47 @@ export async function hardDeleteUser(formData: FormData) {
   const password = String(formData.get('password') ?? '')
   if (!profileId || !password) return { error: 'Profile ID and password required' }
 
+  // A super admin deleting themselves would orphan the very session performing
+  // the delete. The RPC also refuses any is_super_admin profile.
+  if (profileId === session.user!.id) {
+    return { error: 'You cannot delete your own account' }
+  }
+
   if (!(await verifySuperAdminPassword(session.user?.email, password))) {
     return { error: 'Incorrect superadmin password' }
   }
 
   const supabase = createAdminClient()
-  
-  // Get ieee_membership_id to delete from pre_approved_members if it exists
-  const { data: profile } = await supabase.from('profiles').select('ieee_membership_id').eq('id', profileId).single()
-  
-  if (profile?.ieee_membership_id) {
-    await supabase.from('pre_approved_members').delete().eq('ieee_membership_id', profile.ieee_membership_id)
-  }
 
-  // Delete user from auth, which cascades to everything else
-  const { error } = await supabase.auth.admin.deleteUser(profileId)
+  // Snapshot + pre-approval cleanup + delete happen atomically inside the
+  // function (migration 00019). NOT `auth.admin.deleteUser` — migration 00003
+  // decoupled profiles from Supabase Auth, so there is no auth.users row and
+  // that call always 404'd without deleting anything.
+  const { data, error } = await supabase.rpc('hard_delete_profile', {
+    p_profile_id: profileId,
+  })
   if (error) return { error: error.message }
 
+  const snapshot = data as DeletedProfileSnapshot | null
+
+  // The profile row is gone, so the audit entry has to carry the identity
+  // itself — this is what ties the now-dangling actor UUIDs left behind in
+  // audit_log / event_audit_log back to a person.
   await logAdminAction({
     actorProfileId: session.user!.id,
     action: 'hard_delete_user',
     entityType: 'user',
     entityId: profileId,
-    summary: `Hard deleted user from the system`,
+    summary: `Hard deleted user ${snapshot?.full_name ?? profileId} (${snapshot?.email ?? 'no email'}) from the system`,
+    details: {
+      full_name: snapshot?.full_name ?? null,
+      email: snapshot?.email ?? null,
+      ieee_membership_id: snapshot?.ieee_membership_id ?? null,
+      status: snapshot?.status ?? null,
+    },
   })
+
+  revalidatePath('/superadmin/users')
 
   return { success: true }
 }

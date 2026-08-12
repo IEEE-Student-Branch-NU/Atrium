@@ -11,6 +11,30 @@ const PUBLIC_ROUTES = ['/login', '/signup', '/superadmin/login', '/api/auth', '/
 // Routes that require auth but NOT approval
 const AUTH_ONLY_ROUTES = ['/pending', '/rejected', '/complete-registration']
 
+/**
+ * The single portal gate. Fail-closed by design: `approved` is the *only* status
+ * that returns null (= let them through). Everything else — `pending`,
+ * `under_review`, and any status added to the `registration_status` enum later —
+ * lands on `/pending` rather than falling through into the portal.
+ *
+ * This shape matters: the previous version was a deny-list that named only
+ * `pending` and `rejected`, so `under_review` (added in migration 00015) matched
+ * neither branch and silently granted portal access.
+ *
+ * A missing profile means the row was hard-deleted out from under a still-valid
+ * NextAuth JWT — send them to `/login`, never to `/complete-registration`, which
+ * is auth-only and would let them re-register on the deleted identity.
+ */
+function gateRedirectPath(
+  profile: { status?: string | null; ieee_membership_id?: string | null } | null
+): string | null {
+  if (!profile) return '/login'
+  if (!profile.ieee_membership_id) return '/complete-registration'
+  if (profile.status === 'approved') return null
+  if (profile.status === 'rejected') return '/rejected'
+  return '/pending'
+}
+
 export async function authMiddleware(request: NextRequest) {
   const session = await auth()
   const pathname = request.nextUrl.pathname
@@ -75,17 +99,15 @@ export async function authMiddleware(request: NextRequest) {
       .eq('id', session.user.id)
       .single()
 
-    const url = request.nextUrl.clone()
+    const dest = gateRedirectPath(profile) ?? '/'
 
-    if (!profile?.ieee_membership_id) {
-      url.pathname = '/complete-registration'
-    } else if (profile?.status === 'pending') {
-      url.pathname = '/pending'
-    } else if (profile?.status === 'rejected') {
-      url.pathname = '/rejected'
-    } else {
-      url.pathname = '/'
-    }
+    // A hard-deleted profile resolves to '/login', which is where they already
+    // are — render the login page instead of redirecting to it forever. Their
+    // stale NextAuth cookie is replaced on the next successful sign-in.
+    if (dest === pathname) return NextResponse.next()
+
+    const url = request.nextUrl.clone()
+    url.pathname = dest
 
     return NextResponse.redirect(url)
   }
@@ -104,22 +126,10 @@ export async function authMiddleware(request: NextRequest) {
       .eq('id', session.user.id)
       .single()
 
-    const url = request.nextUrl.clone()
-
-    // No IEEE membership ID → needs to complete registration
-    if (!profile?.ieee_membership_id) {
-      url.pathname = '/complete-registration'
-      return NextResponse.redirect(url)
-    }
-
-    // Not approved → route to appropriate page
-    if (profile?.status === 'pending') {
-      url.pathname = '/pending'
-      return NextResponse.redirect(url)
-    }
-
-    if (profile?.status === 'rejected') {
-      url.pathname = '/rejected'
+    const dest = gateRedirectPath(profile)
+    if (dest) {
+      const url = request.nextUrl.clone()
+      url.pathname = dest
       return NextResponse.redirect(url)
     }
   }

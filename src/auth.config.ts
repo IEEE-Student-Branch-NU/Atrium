@@ -76,6 +76,12 @@ export default {
 
         if (profile) {
           token.profileId = profile.id
+          // NOTE: written only on signIn/signUp and never refreshed, so this is
+          // stale for the rest of the session's lifetime. It must NEVER become
+          // the source of truth for portal access — an admin moving a member to
+          // `under_review` or `rejected` mid-session would not be reflected here.
+          // Gating reads `profiles.status` fresh from the DB in
+          // gateRedirectPath (@/utils/supabase/middleware) and in (portal)/layout.
           token.status = profile.status
           token.isMembershipComplete = !!profile.ieee_membership_id
         }

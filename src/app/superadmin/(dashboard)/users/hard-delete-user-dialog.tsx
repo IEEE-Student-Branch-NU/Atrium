@@ -49,8 +49,10 @@ export function HardDeleteUserDialog({ profileId }: { profileId: string }) {
         <DialogHeader>
           <DialogTitle className="text-destructive">Permanent Delete Warning</DialogTitle>
           <DialogDescription>
-            This action is irreversible. It will permanently delete this user's account, all their history, 
-            permissions, event requests, and any pre-approval records.
+            This action is irreversible. It permanently erases this user&apos;s account, memberships,
+            permissions, notifications, position requests and pre-approval record. Events and
+            approvals they authored are <strong>kept</strong> and reattributed to
+            &ldquo;their name (deleted)&rdquo;, and the audit log of their actions is preserved.
           </DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4 pt-4">

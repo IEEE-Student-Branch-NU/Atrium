@@ -5,7 +5,7 @@ description: >
   paths, layouts, middleware, or queries, and on request to audit the ~100ms
   budget. Read-only: counts round-trips, finds duplicate/serial reads, missing
   cache(), N+1s, and unbounded scans; proposes fixes for backend-engineer.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, SendMessage, ListAgents
 model: sonnet
 ---
 

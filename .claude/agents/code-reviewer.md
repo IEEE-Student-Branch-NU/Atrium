@@ -6,7 +6,7 @@ description: >
   correctness, security (RLS-bypass/service-role, edge-safety, injection),
   convention adherence, and performance regressions. Blocks or approves with
   ranked findings.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, SendMessage, ListAgents
 model: opus
 ---
 

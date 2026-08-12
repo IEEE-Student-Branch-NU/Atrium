@@ -6,7 +6,7 @@ description: >
   whenever a change touches the two-portal model, auth/permission boundaries,
   the request-fan-out, or the ~100ms response budget. Produces a design/plan and
   a go/no-go, not code.
-tools: Read, Grep, Glob, Bash, WebFetch
+tools: Read, Grep, Glob, Bash, WebFetch, SendMessage, ListAgents
 model: opus
 ---
 

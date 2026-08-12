@@ -6,7 +6,7 @@ description: >
   task requires writing/modifying server-side code. Follows a design from
   system-design-engineer when one exists; always ends by handing off to
   code-tester and code-reviewer.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, SendMessage, ListAgents
 model: sonnet
 ---
 

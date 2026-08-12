@@ -5,7 +5,7 @@ description: >
   Vitest coverage for new/changed logic and to run the build+test gate. Focuses
   on pure functions and edge cases (permissions, gating, sanitizers, notification
   routing). Reports pass/fail honestly with output.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, SendMessage, ListAgents
 model: sonnet
 ---
 

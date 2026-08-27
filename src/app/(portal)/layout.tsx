@@ -95,7 +95,7 @@ export default async function PortalLayout({
               user={userInfo}
               unreadCount={unreadNotifications.length}
             />
-            <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 lg:p-8 md:pb-6 lg:pb-8">
+            <main className="flex-1 overflow-y-auto p-6">
               {children}
             </main>
           </div>

@@ -36,6 +36,7 @@ export function TopBar({ user, title, unreadCount = 0 }: TopBarProps) {
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
       {/* Left: Page Title + Active Workspace Info */}
       <div className="flex items-center gap-4">
+        <div className="w-10 md:hidden" /> {/* spacer for mobile hamburger */}
         <div>
           <h1 className="text-lg font-semibold tracking-tight">
             {title ?? 'Dashboard'}

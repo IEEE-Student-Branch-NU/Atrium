@@ -245,7 +245,7 @@ export function EditEventForm({ event, branches, eventTypes }: { event: any, bra
                 <Label htmlFor="registration_url" className="flex items-center gap-2">
                   Registration / Ticketing Link *
                 </Label>
-                <Input id="registration_url" name="registration_url" type="url" defaultValue={event.banner?.registration_url} placeholder="Google Form or Konfhub link" required />
+                <Input id="registration_url" name="registration_url" type="text" defaultValue={event.banner?.registration_url} placeholder="Google Form or Konfhub link" required />
                 <p className="text-xs text-muted-foreground">Mandatory: Google Form for free, Konfhub/Ticketing for paid.</p>
               </div>
             </div>

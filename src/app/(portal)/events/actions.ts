@@ -135,6 +135,7 @@ export async function updateEvent(id: string, data: any) {
   }
 
   revalidatePath('/events', 'layout')
+  revalidatePath('/superadmin', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -164,6 +165,7 @@ export async function deleteEvent(id: string) {
   }
 
   revalidatePath('/events', 'layout')
+  revalidatePath('/superadmin', 'layout')
 }
 
 export async function submitEvent(id: string) {
@@ -209,6 +211,7 @@ export async function submitEvent(id: string) {
   }
   
   revalidatePath('/events', 'layout')
+  revalidatePath('/superadmin', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -267,6 +270,7 @@ export async function approveEvent(id: string, comment?: string) {
   }
 
   revalidatePath('/events', 'layout')
+  revalidatePath('/superadmin', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -324,6 +328,7 @@ export async function rejectEvent(id: string, comment?: string) {
   }
 
   revalidatePath('/events', 'layout')
+  revalidatePath('/superadmin', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -363,6 +368,7 @@ export async function publishEvent(id: string) {
   }
 
   revalidatePath('/events', 'layout')
+  revalidatePath('/superadmin', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -398,6 +404,7 @@ export async function completeEvent(id: string, postEventData?: any) {
 
   if (error) throw error
   revalidatePath('/events', 'layout')
+  revalidatePath('/superadmin', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }

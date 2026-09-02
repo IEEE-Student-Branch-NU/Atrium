@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
+  Calendar,
   Landmark,
   LayoutDashboard,
   Building2,
@@ -51,6 +52,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { label: 'Dashboard', href: '/superadmin', icon: LayoutDashboard },
   { label: 'Organizations', href: '/superadmin/organizations', icon: Building2 },
+  { label: 'Events', href: '/superadmin/events', icon: Calendar },
   { label: 'Users', href: '/superadmin/users', icon: Users },
   { label: 'Analytics', href: '/superadmin/analytics', icon: PieChart },
   { label: 'Approvals', href: '/superadmin/approvals', icon: UserPlus },

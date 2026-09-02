@@ -1,6 +1,6 @@
 'use client'
 
-import { useTheme } from '@teispace/next-themes'
+import { useTheme } from 'next-themes'
 import { Moon, Sun, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'

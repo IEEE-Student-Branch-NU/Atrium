@@ -61,7 +61,7 @@ export async function createEvent(data: any) {
     summary: `Drafted event "${event.name}"`
   })
 
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
   return event
 }
 
@@ -134,7 +134,7 @@ export async function updateEvent(id: string, data: any) {
     })
   }
 
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -163,7 +163,7 @@ export async function deleteEvent(id: string) {
     })
   }
 
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
 }
 
 export async function submitEvent(id: string) {
@@ -208,7 +208,7 @@ export async function submitEvent(id: string) {
     })
   }
   
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -266,7 +266,7 @@ export async function approveEvent(id: string, comment?: string) {
     })
   }
 
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -323,7 +323,7 @@ export async function rejectEvent(id: string, comment?: string) {
     })
   }
 
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -362,7 +362,7 @@ export async function publishEvent(id: string) {
     })
   }
 
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }
@@ -397,7 +397,7 @@ export async function completeEvent(id: string, postEventData?: any) {
     .single()
 
   if (error) throw error
-  revalidatePath('/events')
+  revalidatePath('/events', 'layout')
   revalidatePath(`/events/${id}`)
   return event
 }

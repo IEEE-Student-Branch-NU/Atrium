@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { Check, X, Edit, MessageSquare, CalendarIcon, Trash2 } from 'lucide-react'
+import { Check, X, Edit, MessageSquare, CalendarIcon, Trash2, Plus, Eye } from 'lucide-react'
 import { approveEvent, rejectEvent, publishEvent, deleteEvent } from '@/app/(portal)/events/actions'
 
 interface GlobalEvent {
@@ -36,11 +36,19 @@ export function SuperadminEventsClient({ events }: { events: GlobalEvent[] }) {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Global Events Management</h1>
-        <p className="text-muted-foreground">
-          View and manage all events across all branches as a Superadmin.
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Global Events Management</h1>
+          <p className="text-muted-foreground">
+            View and manage all events across all branches as a Superadmin.
+          </p>
+        </div>
+        <Link href="/superadmin/events/create">
+          <Button className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Create Event
+          </Button>
+        </Link>
       </div>
 
       {pendingEvents.length > 0 && (
@@ -147,6 +155,11 @@ function EventApprovalCard({ event }: { event: GlobalEvent }) {
       </div>
       
       <div className="mt-auto flex flex-col gap-2 pt-4 border-t border-border/50">
+        <Link href={`/events/${event.id}`}>
+          <Button variant="outline" size="sm" className="w-full flex items-center gap-2">
+            <Eye className="w-3.5 h-3.5" /> View Event Details
+          </Button>
+        </Link>
         <div className="flex gap-2">
           <Button
             size="sm"
@@ -248,8 +261,13 @@ function GlobalEventCard({ event }: { event: GlobalEvent }) {
         </div>
       </div>
       
-      <div className="mt-auto flex items-center gap-2 pt-4 border-t border-border/50">
-        <Link href={`/events/${event.id}/edit`} className="flex-1">
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4 border-t border-border/50">
+        <Link href={`/events/${event.id}`} className="flex-1 min-w-[30%]">
+          <Button variant="outline" size="sm" className="w-full flex items-center gap-2">
+            <Eye className="w-3 h-3" /> View
+          </Button>
+        </Link>
+        <Link href={`/events/${event.id}/edit`} className="flex-1 min-w-[30%]">
           <Button variant="outline" size="sm" className="w-full flex items-center gap-2">
             <Edit className="w-3 h-3" /> Edit
           </Button>
@@ -259,7 +277,7 @@ function GlobalEventCard({ event }: { event: GlobalEvent }) {
           size="sm" 
           onClick={handleDelete}
           disabled={isDeleting}
-          className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10 flex items-center gap-2"
+          className="flex-1 min-w-[30%] text-destructive hover:text-destructive hover:bg-destructive/10 flex items-center gap-2"
         >
           <Trash2 className="w-3 h-3" /> Delete
         </Button>
